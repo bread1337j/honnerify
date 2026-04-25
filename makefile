@@ -1,21 +1,24 @@
 .PHONY: compile run clean
 
 BIN = bin
-TARGET = $(BIN)/termslides
+TARGET = $(BIN)/honnerify
 BUILD = build
 SRC = src
+INCLUDE = include
 
-INCLUDES = -Iinclude -I$(SRC)/gui
-CFLAGS = $(INCLUDES) -lncurses -MMD -MP
+INCLUDES = -I$(INCLUDE)
+CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm
+ARGS = honner.png math.png
 
 DEPS := $(OBJECTS:.o=.d)
 
 SOURCES := $(shell find $(SRC) -name '*.c')
 HEADERS := $(shell find $(SRC) -name '*.h')
+HEADERS := $(shell find $(INCLUDE) -name '*.h')
 OBJECTS = $(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(SOURCES))
 
 run: compile
-	./$(TARGET)
+	./$(TARGET) $(ARGS)
 
 compile: $(TARGET)
 	@echo $(OBJECTS)
