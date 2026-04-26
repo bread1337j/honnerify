@@ -8,7 +8,7 @@ INCLUDE = include
 
 INCLUDES = -I$(INCLUDE)
 CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm
-ARGS = honner.png math.png
+ARGS = honner.png SmallTarget.png
 
 DEPS := $(OBJECTS:.o=.d)
 
