@@ -7,7 +7,7 @@ SRC = src
 INCLUDE = include
 
 INCLUDES = -I$(INCLUDE)
-CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm
+CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm -fopenmp
 ARGS = honner.png SmallTarget.png
 
 DEPS := $(OBJECTS:.o=.d)

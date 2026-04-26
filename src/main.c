@@ -19,7 +19,9 @@ int main(int argc, char** argv){
 	struct image* source = loadImage(argv[2]);
 
 	struct image* target = resizeImage(_target, source);
-		
+	
+
+
 	//struct vectorN* supplyVector = imgToStochVec(source);
 	//struct vectorN* demandVector = imgToStochVec(target);
 
@@ -28,11 +30,12 @@ int main(int argc, char** argv){
 	}
 	printf("\n");*/
 	
-	stinkhorn(source, target, 0.5, 0.3);
+	struct image* output = stinkhorn(source, target, 0.01, 1e-5);
 
 
-	writeImage(target, "Sus.bmp");
-	writeImage(_target, "_Sus.bmp");
+	writeImage(target, "output/RescaledTarget.bmp");
+	//writeImage(_target, "output/_Sus.bmp");
+	writeImage(output, "output/Output.bmp");
 
 	return 0;
 }
