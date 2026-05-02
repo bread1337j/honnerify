@@ -5,6 +5,7 @@ TARGET = $(BIN)/honnerify
 BUILD = build
 SRC = src
 INCLUDE = include
+OUTPUT = output
 
 INCLUDES = -I$(INCLUDE)
 CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm -fopenmp
@@ -17,7 +18,7 @@ HEADERS := $(shell find $(SRC) -name '*.h')
 HEADERS := $(shell find $(INCLUDE) -name '*.h')
 OBJECTS = $(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(SOURCES))
 
-run: compile
+run: compile $(OUTPUT)
 	./$(TARGET) $(ARGS)
 
 compile: $(TARGET)
@@ -33,6 +34,9 @@ $(BUILD)/%.o: $(SRC)/%.c $(BUILD)
 
 $(BUILD): 
 	@mkdir -p build
+
+$(OUTPUT): 
+	@mkdir -p output
 
 clean: 
 	rm -rf $(BUILD) $(BIN)
