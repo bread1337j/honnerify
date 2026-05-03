@@ -74,14 +74,14 @@ double vNDot(struct vectorN* v0, struct vectorN* v1){
 }
 
 
-#define WEIGHT_DIST 0.90
+#define WEIGHT_DIST 0.80
 #define WEIGHT_COL (1.00-WEIGHT_DIST)
 
 #define NORM_POS ((double)img0->width)
 
 double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u32 j){
-    struct vector2 p0 = {(double)(i % img0->width) / NORM_POS, (double)(i / img0->width) / NORM_POS};
-    struct vector2 p1 = {(double)(j % img1->width) / NORM_POS, (double)(j / img1->width) / NORM_POS};
+    struct vector2 p0 = {(double)(i % img0->width) / img0->width, (double)(i / img0->width) / img0->width};
+    struct vector2 p1 = {(double)(j % img1->width) / img1->width, (double)(j / img1->width) / img1->width};
 
     struct vector3 c0 = {
         (double)(*((u8*)img0->data + (i*3))) / 255.0,
@@ -94,10 +94,10 @@ double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u3
         (double)(*((u8*)img1->data + (j*3) + 2)) / 255.0
     };
 
-    // Use Euclidean distance for color for better results
 	double dPos = (p0.x-p1.x)*(p0.x-p1.x) + (p0.y-p1.y)*(p0.y-p1.y);
     double dCol = (c0.x-c1.x)*(c0.x-c1.x) + (c0.y-c1.y)*(c0.y-c1.y) + (c0.z-c1.z)*(c0.z-c1.z);
-    
+	//double dCol = (0.2126 * c0.x + 0.7152 * c0.y + 0.0722 * c0.z) - (0.2126 * c1.x + 0.7152 * c1.y + 0.0722 * c1.z);
+
     return (WEIGHT_DIST * dPos) + (WEIGHT_COL * dCol);
 }
 
@@ -122,8 +122,9 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 	double error = 1.0 + precision;
 	double pError = error;
 	double dError = 1;
+	u8 c = 14;
 	u16 iter = 0;
-	while(error > precision && fabs(dError) > EPSILON && iter < 2000){ //the vectors must be stochastic and whatnot, so this value is a 0-1 precision scale.
+	while(error > precision && c > 0 && iter < 200){ //the vectors must be stochastic and whatnot, so this value is a 0-1 precision scale.
 		#pragma omp parallel for
 		for(int i=0; i<v0->n; i++){
 			double val = 0.0;
@@ -154,19 +155,47 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 		}
 		
 		dError = error-pError;
-		
+		if(fabs(dError) < 1e-5){
+			c--;
+		}
 
 		printf("err(%d)=%f\n", iter, error);
+		if(iter%5==0){
+			struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
+			output->width = supply->width;
+			output->height = supply->height;
+			output->bytesPerPixel = supply->bytesPerPixel;
+			output->data = malloc(output->bytesPerPixel * output->width * output->height);
+			double* buffer = calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
+			
+			for(int i=0; i<u0->n; i++){
+				u8* ptr0 = supply->data+(i*supply->bytesPerPixel);
+				for(int j=0; j<v0->n; j++){
+					double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
+					double* ptr1 = buffer+(j*output->bytesPerPixel);
+					for(int k=0; k<output->bytesPerPixel; k++){
+						*(ptr1+k) += *(ptr0+k)*val*output->width*output->height;
+					}
+				}
+			}
+			for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
+				*((u8*)(output->data)+i) = (u8)ceil(buffer[i]);
+			}
+			char* str = calloc(sizeof(char), 40); 
+			sprintf(str, "output/gif/%d.bmp", iter);
+			writeImage(output, str);
+		}
 		iter++;
 		//usleep(10000);
 	}
-	
+	/*
 	printf("In: \n");
 	printVector(supplyVector);
 	printVector(demandVector);
 	printf("Out: \n");
 	printVector(u0);
 	printVector(v0);
+	*/
 	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
 	printf("output %p\n", output);
 	output->width = supply->width;
@@ -176,11 +205,6 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 	double* buffer = calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
 	printf("output->data %p\n", output->data);
 	
-	double* T_x = malloc(u0->n*sizeof(double));
-	printf("T_x %p\n", T_x);
-	double* T_y = malloc(u0->n*sizeof(double));
-	//double is my admission of defeat,,,
-	printf("T_y %p\n", T_y);
 	printf("%d\n", output->bytesPerPixel);
 	
 	for(int i=0; i<u0->n; i++){
@@ -190,7 +214,7 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
 			double* ptr1 = buffer+(j*output->bytesPerPixel);
 			for(int k=0; k<output->bytesPerPixel; k++){
-				*(ptr1+k) += *(ptr0+k)*val*255;
+				*(ptr1+k) += *(ptr0+k)*val*output->width*output->height;
 			}
 
 			//printf(" %f ", val);
@@ -201,7 +225,7 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		*((u8*)(output->data)+i) = (u8)ceil(buffer[i]);
 	}
-	printf("%hhd\n", *((u8*)output->data+4));
+	printf("%hhd\n", *((u8*)output->data));
 
 	return output;
 

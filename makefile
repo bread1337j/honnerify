@@ -37,6 +37,7 @@ $(BUILD):
 
 $(OUTPUT): 
 	@mkdir -p output
+	@mkdir -p output/gif
 
 clean: 
 	rm -rf $(BUILD) $(BIN)
