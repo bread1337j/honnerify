@@ -74,31 +74,13 @@ double vNDot(struct vectorN* v0, struct vectorN* v1){
 }
 
 
-#define WEIGHT_DIST 0.80
-#define WEIGHT_COL (1.00-WEIGHT_DIST)
-
-#define NORM_POS ((double)img0->width)
-
 double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u32 j){
     struct vector2 p0 = {(double)(i % img0->width) / img0->width, (double)(i / img0->width) / img0->width};
     struct vector2 p1 = {(double)(j % img1->width) / img1->width, (double)(j / img1->width) / img1->width};
 
-    struct vector3 c0 = {
-        (double)(*((u8*)img0->data + (i*3))) / 255.0,
-        (double)(*((u8*)img0->data + (i*3) + 1)) / 255.0,
-        (double)(*((u8*)img0->data + (i*3) + 2)) / 255.0
-    };
-    struct vector3 c1 = {
-        (double)(*((u8*)img1->data + (j*3))) / 255.0,
-        (double)(*((u8*)img1->data + (j*3) + 1)) / 255.0,
-        (double)(*((u8*)img1->data + (j*3) + 2)) / 255.0
-    };
-
 	double dPos = (p0.x-p1.x)*(p0.x-p1.x) + (p0.y-p1.y)*(p0.y-p1.y);
-    double dCol = (c0.x-c1.x)*(c0.x-c1.x) + (c0.y-c1.y)*(c0.y-c1.y) + (c0.z-c1.z)*(c0.z-c1.z);
-	//double dCol = (0.2126 * c0.x + 0.7152 * c0.y + 0.0722 * c0.z) - (0.2126 * c1.x + 0.7152 * c1.y + 0.0722 * c1.z);
 
-    return (WEIGHT_DIST * dPos) + (WEIGHT_COL * dCol);
+    return dPos;
 }
 
 
