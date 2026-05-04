@@ -42,10 +42,11 @@ struct vectorN* imgToStochVec(struct image* img){
 		out->data[i] = 0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)); 
 		sum += out->data[i];
 	}
+	
 	for(int i=0; i<out->n; i++){
 		out->data[i] = out->data[i] / sum;
 	}
-
+	
 	return out;
 }
 
