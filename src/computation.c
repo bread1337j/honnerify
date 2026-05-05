@@ -81,7 +81,7 @@ double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u3
 
 	double dPos = (p0.x-p1.x)*(p0.x-p1.x) + (p0.y-p1.y)*(p0.y-p1.y);
 
-    return dPos;
+    return 1*dPos;
 }
 
 
@@ -143,31 +143,6 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 		}
 
 		printf("err(%d)=%f\n", iter, error);
-		if(iter%5==0){
-			struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
-			output->width = supply->width;
-			output->height = supply->height;
-			output->bytesPerPixel = supply->bytesPerPixel;
-			output->data = malloc(output->bytesPerPixel * output->width * output->height);
-			double* buffer = calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
-			
-			for(int i=0; i<u0->n; i++){
-				u8* ptr0 = supply->data+(i*supply->bytesPerPixel);
-				for(int j=0; j<v0->n; j++){
-					double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
-					double* ptr1 = buffer+(j*output->bytesPerPixel);
-					for(int k=0; k<output->bytesPerPixel; k++){
-						*(ptr1+k) += *(ptr0+k)*val*output->width*output->height;
-					}
-				}
-			}
-			for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
-				*((u8*)(output->data)+i) = (u8)ceil(buffer[i]);
-			}
-			char* str = calloc(sizeof(char), 40); 
-			sprintf(str, "output/gif/%d.bmp", iter);
-			writeImage(output, str);
-		}
 		iter++;
 		//usleep(10000);
 	}
@@ -197,7 +172,7 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
 			double* ptr1 = buffer+(j*output->bytesPerPixel);
 			for(int k=0; k<output->bytesPerPixel; k++){
-				*(ptr1+k) += *(ptr0+k)*val*output->width*output->height;
+				*(ptr1+k) += *(ptr0+k)*val*255;//*output->width*output->height;
 			}
 
 			//printf(" %f ", val);
@@ -205,10 +180,21 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 		//printf("\n");
 	}
 	printf("%f\n", buffer[0]);
+	u32 sum_supply = 0;
+	u32 sum_output = 0;
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
-		*((u8*)(output->data)+i) = (u8)ceil(buffer[i]);
+		if(buffer[i] > 255){
+			buffer[i] = 255;
+		}else if(buffer[i] < 0){
+			buffer[i] = 0;
+		}
+		*((u8*)(output->data)+i) = (u8)(buffer[i]);
+		sum_supply+=*(((u8*)supply->data+i));
+		sum_output+=*(((u8*)output->data+i));
 	}
 	printf("%hhd\n", *((u8*)output->data));
+	printf("Old mass: %d\nNew mass: %d\n", sum_supply, sum_output);
+	printf("These numbers should be the same!\n");
 
 	return output;
 
