@@ -81,7 +81,7 @@ double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u3
 
 	double dPos = (p0.x-p1.x)*(p0.x-p1.x) + (p0.y-p1.y)*(p0.y-p1.y);
 
-    return 1*dPos;
+    return 4*dPos;
 }
 
 
@@ -91,6 +91,83 @@ double gibbsVal(const struct image* img0, const struct image* img1, u32 i, u32 j
 }
 
 #define EPSILON 1e-10
+
+struct image* createImage(struct image* supply, struct image* demand, struct vectorN* v0, struct vectorN* u0, double reg){
+	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
+	struct image* output2 = resizeImage(supply, supply);//malloc(sizeof(struct image));
+	struct image* output3 = resizeImage(supply, supply);//malloc(sizeof(struct image));
+	printf("output %p\n", output);
+	//output->data = malloc(output->bytesPerPixel * output->width * output->height);
+	double* buffer_demand = calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
+	double* buffer_supply = malloc(output->bytesPerPixel * sizeof(double) * output->width * output->height);
+	printf("output->data %p\n", output->data);
+	
+	printf("%d\n", output->bytesPerPixel);
+	
+	u32 sum_supply = 0;
+	for(int i=0; i<output->width * output->height; i++){
+		for(int j=0; j<output->bytesPerPixel; j++){
+			buffer_supply[i*output->bytesPerPixel+j] = *((u8*)output->data+i*output->bytesPerPixel+j);
+			sum_supply += buffer_supply[i*output->bytesPerPixel+j];
+		}
+	}
+	printf("buffer_supply sum: %d\n", sum_supply);
+
+	for(int i=0; i<u0->n; i++){
+		u8* ptr0 = supply->data+(i*supply->bytesPerPixel);
+		for(int j=0; j<v0->n; j++){
+			//calculate the transport plan matrix at this entry ij
+			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
+			double* ptr1 = buffer_demand+(j*output->bytesPerPixel);
+			double* ptr2 = buffer_supply+(i*output->bytesPerPixel);
+			for(int k=0; k<output->bytesPerPixel; k++){
+				double transport = (*(ptr0+k)*val*output->height*75);//*output->width*output->height;
+				*(ptr1+k) += transport;
+				*(ptr2+k) -= transport;
+				
+			}
+
+			//printf(" %f ", val);
+		}
+		//printf("\n");
+	}
+	sum_supply = 0;
+	u32 sum_demand = 0;
+	for(int i=0; i<output->width * output->height; i++){
+		for(int j=0; j<output->bytesPerPixel; j++){
+			sum_supply += buffer_supply[i*output->bytesPerPixel+j];
+			sum_demand += buffer_demand[i*output->bytesPerPixel+j];
+		}
+	}
+	printf("buffer_supply sum: %d\n", sum_supply);
+	printf("buffer_demand sum: %d\n", sum_demand);
+	printf("%f\n", buffer_demand[0]);
+	sum_supply = 0;
+	sum_demand = 0;
+	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
+		//double pixelVal=buffer_supply[i]+buffer_demand[i];//-buffer_supply[i];
+		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
+		if(pixelVal > 255){
+			pixelVal = 255;
+		}else if(pixelVal < 0){
+			pixelVal = 0;
+		}
+		*((u8*)(output->data)+i) = (u8)(pixelVal);
+		*((u8*)(output2->data)+i) = (u8)(buffer_demand[i]);
+		*((u8*)(output3->data)+i) = (u8)(buffer_supply[i]);
+
+		sum_supply+=*(((u8*)supply->data+i));
+		sum_demand+=*(((u8*)output->data+i));
+	}
+	printf("%hhd\n", *((u8*)output->data));
+	printf("Old mass: %d\nNew mass: %d\n", sum_supply, sum_demand);
+	printf("These numbers should be roughly the same!\n");
+	
+	writeImage(output2, "output/demand_vec.bmp");
+	writeImage(output3, "output/supply_vec.bmp");
+	return output;
+}
+
 
 struct image* stinkhorn(struct image* supply, struct image* demand, double reg, double precision){
 	struct vectorN* supplyVector = imgToStochVec(supply);
@@ -154,49 +231,8 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 	printVector(u0);
 	printVector(v0);
 	*/
-	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
-	printf("output %p\n", output);
-	output->width = supply->width;
-	output->height = supply->height;
-	output->bytesPerPixel = supply->bytesPerPixel;
-	output->data = malloc(output->bytesPerPixel * output->width * output->height);
-	double* buffer = calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
-	printf("output->data %p\n", output->data);
-	
-	printf("%d\n", output->bytesPerPixel);
-	
-	for(int i=0; i<u0->n; i++){
-		u8* ptr0 = supply->data+(i*supply->bytesPerPixel);
-		for(int j=0; j<v0->n; j++){
-			//calculate the transport plan matrix at this entry ij
-			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
-			double* ptr1 = buffer+(j*output->bytesPerPixel);
-			for(int k=0; k<output->bytesPerPixel; k++){
-				*(ptr1+k) += *(ptr0+k)*val*255;//*output->width*output->height;
-			}
 
-			//printf(" %f ", val);
-		}
-		//printf("\n");
-	}
-	printf("%f\n", buffer[0]);
-	u32 sum_supply = 0;
-	u32 sum_output = 0;
-	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
-		if(buffer[i] > 255){
-			buffer[i] = 255;
-		}else if(buffer[i] < 0){
-			buffer[i] = 0;
-		}
-		*((u8*)(output->data)+i) = (u8)(buffer[i]);
-		sum_supply+=*(((u8*)supply->data+i));
-		sum_output+=*(((u8*)output->data+i));
-	}
-	printf("%hhd\n", *((u8*)output->data));
-	printf("Old mass: %d\nNew mass: %d\n", sum_supply, sum_output);
-	printf("These numbers should be the same!\n");
-
-	return output;
+	return createImage(supply, demand, u0, v0, reg);
 
 
 
