@@ -30,9 +30,9 @@ int main(int argc, char** argv){
 	}
 	printf("\n");*/
 	
-	struct image* output = stinkhorn(source, target, 0.01, 1e-5);
-
 	writeImage(source, "output/Source.bmp");
+	struct image* output = stinkhorn(source, target, 1, 1e-5);
+
 	writeImage(target, "output/RescaledTarget.bmp");
 	//writeImage(_target, "output/_Sus.bmp");
 	writeImage(output, "output/Output.bmp");

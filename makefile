@@ -8,7 +8,7 @@ INCLUDE = include
 OUTPUT = output
 
 INCLUDES = -I$(INCLUDE)
-CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm -fopenmp -O3
+CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm -fopenmp
 ARGS = SmallTarget.png SmallSrc.png
 
 DEPS := $(OBJECTS:.o=.d)
