@@ -40,6 +40,7 @@ struct vectorN* imgToStochVec(struct image* img){
 	u8* ptr = img->data;
 	for(int i=0; i<out->n; i++){
 		out->data[i] = 0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)); 
+		//out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) * (*(ptr+i*3+1)) * (*(ptr+i*3+1)) * (*(ptr+i*3+2)) * (*(ptr+i*3+2)); 
 		sum += out->data[i];
 	}
 	
@@ -92,7 +93,7 @@ double gibbsVal(const struct image* img0, const struct image* img1, u32 i, u32 j
 
 #define EPSILON 1e-10
 
-struct image* createImage(struct image* supply, struct image* demand, struct vectorN* v0, struct vectorN* u0, double reg){
+struct image* createImage(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg){
 	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
 	struct image* output2 = resizeImage(supply, supply);//malloc(sizeof(struct image));
 	struct image* output3 = resizeImage(supply, supply);//malloc(sizeof(struct image));
@@ -118,14 +119,14 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	}
 	printf("buffer_supply sum: %d\n", sum_supply);
 
-	printf("Transport plan matrix: \n");
+	//printf("Transport plan matrix: \n");
 
 	for(int i=0; i<u0->n; i++){
 		for(int j=0; j<v0->n; j++){
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j] * output->width;
-			printf(" %f ", val);
+			//printf(" %f ", val);
 		}
-		printf("\n");
+		//printf("\n");
 	}
 	for(int i=0; i<u0->n; i++){
 		u8* ptr0 = supply->data+(i*supply->bytesPerPixel);
@@ -134,18 +135,18 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j] * output->width;
 			double* ptr1 = buffer_demand+(j*output->bytesPerPixel);
 			
-			printf("<");
+		//	printf("<");
 			for(int k=0; k<output->bytesPerPixel; k++){
-				double transport = (*(ptr0+k)*val);//*output->width*output->height;
+				double transport = (*(ptr0+k))*val;//*output->width*output->height;
 				*(ptr1+k) += transport;
 				*(ptr0+k) -= transport;
-				printf(" %f ", transport);
+				//printf(" %f/%.4f/%.4f", transport, (*(ptr0+k)), val);
 				
 			}
-			printf(">");
+			//printf(">");
 
 		}
-		printf("\n");
+		//printf("\n");
 	}
 	sum_supply = 0;
 	u32 sum_demand = 0;
@@ -209,7 +210,9 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 				//val += gibbs(cost, reg) * u0->data[j];
 				val += gibbsVal(supply, demand, j, i, reg)*u0->data[j];
 			}
-			v0->data[i] = demandVector->data[i] / (val+EPSILON);
+			if(val > 1e-7){
+				v0->data[i] = demandVector->data[i] / (val);
+			}
 		}
 		pError = error;
 		error = 0.0;
@@ -223,7 +226,9 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 				//printf("%f\n", val);
 			}
 			double temp = u0->data[i];
-			u0->data[i] = supplyVector->data[i] / (val+EPSILON);
+			if(val > 1e-7){
+				u0->data[i] = supplyVector->data[i] / (val);
+			}
 
 			double diff = temp - u0->data[i];
 			error += (diff > 0) ? diff : -diff; 
@@ -239,14 +244,15 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 		iter++;
 		//usleep(10000);
 	}
-	/*
-	printf("In: \n");
+	
+	/*printf("In: \n");
 	printVector(supplyVector);
 	printVector(demandVector);
 	printf("Out: \n");
 	printVector(u0);
 	printVector(v0);
 	*/
+	
 
 	return createImage(supply, demand, u0, v0, reg);
 
