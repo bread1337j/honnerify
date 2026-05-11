@@ -9,7 +9,7 @@ OUTPUT = output
 
 INCLUDES = -I$(INCLUDE)
 CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm -fopenmp -O3
-ARGS = SmallTarget.png SmallSrc.png
+ARGS = -t SmallTarget.png -s SmallSrc.png
 
 DEPS := $(OBJECTS:.o=.d)
 

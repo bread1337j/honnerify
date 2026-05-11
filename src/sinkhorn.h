@@ -22,5 +22,5 @@ struct vectorN {
 	double* data;
 };
 struct vectorN* imgToStochVec(struct image* img);
-struct image* stinkhorn(struct image* supply, struct image* demand, double reg, double precision);
+struct image* stinkhorn(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 makeGif);
 #endif

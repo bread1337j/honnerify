@@ -6,17 +6,65 @@
 #include "image.h"
 #include "sinkhorn.h"
 
+#include <string.h>
 
 
 
 int main(int argc, char** argv){
-	if(argc < 3){
-		printf("Not enough arguments\n");
-		exit(1);
+
+	struct image* _target = NULL;//loadImage(argv[1]);
+	struct image* source = NULL;//loadImage(argv[2]);
+	int maxIter = 100;
+	double reg = 0.1;
+	char* outputString = "output/Output.bmp";
+	int makeGif = 0;
+	for(int i=1; i<argc; i++){
+		if(!strcmp(argv[i], "-t")){
+			i+=1;
+			if(argc <= i){
+				printf("Not enough arguments for parameter %s", argv[i-1]);
+				exit(2);
+			}
+			_target = loadImage(argv[i]);
+		} else if(!strcmp(argv[i], "-s") || !strcmp(argv[i], "-src")){
+			i+=1;
+			if(argc <= i){
+				printf("Not enough arguments for parameter %s", argv[i-1]);
+				exit(2);
+			}
+			source = loadImage(argv[i]);
+		} else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "-iter")){
+			i+=1;
+			if(argc <= i){
+				printf("Not enough arguments for parameter %s", argv[i-1]);
+				exit(2);
+			}
+			sscanf(argv[i], "%d", &maxIter);
+		} else if(!strcmp(argv[i], "-r") || !strcmp(argv[i], "-reg")){
+			i+=1;
+			if(argc <= i){
+				printf("Not enough arguments for parameter %s", argv[i-1]);
+				exit(2);
+			}
+			sscanf(argv[i], "%f", &reg);
+		} else if(!strcmp(argv[i], "-g") || !strcmp(argv[i], "-gif")){
+			makeGif = 1;
+		} else {
+			printf("Unknown argument %s\n", argv[i]);
+			exit(2);
+		}
+	}
+	
+	if(_target == NULL){
+		printf("No target image specified!\n");
+		exit(2);
+	}
+	if(source == NULL){
+		printf("No source image specified!\n");
+		exit(2);
 	}
 
-	struct image* _target = loadImage(argv[1]);
-	struct image* source = loadImage(argv[2]);
+
 	if(_target->bytesPerPixel != source->bytesPerPixel){
 		printf("Bytes per pixel don't match, the output will be straight NONSENSE\n");
 	}
@@ -34,11 +82,11 @@ int main(int argc, char** argv){
 	printf("\n");*/
 	
 	writeImage(source, "output/Source.bmp");
-	struct image* output = stinkhorn(source, target, 0.1, 1e-5);
+	struct image* output = stinkhorn(source, target, reg, 1e-5, maxIter, makeGif);
 
 	writeImage(target, "output/RescaledTarget.bmp");
 	//writeImage(_target, "output/_Sus.bmp");
-	writeImage(output, "output/Output.bmp");
+	writeImage(output, outputString);
 
 	return 0;
 }

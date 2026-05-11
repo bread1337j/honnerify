@@ -130,7 +130,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 		}
 		//printf("\n");
 	}
-	double mult = supplyVector->n * 0.5;
+	double mult = supplyVector->n * 0.9;
 	for(int i=0; i<u0->n; i++){
 		u8* ptr0 = supply->data+(i*supply->bytesPerPixel);
 		for(int j=0; j<v0->n; j++){
@@ -190,7 +190,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 }
 
 
-struct image* stinkhorn(struct image* supply, struct image* demand, double reg, double precision){
+struct image* stinkhorn(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 makeGif){
 	struct vectorN* supplyVector = imgToStochVec(supply);
 	struct vectorN* demandVector = imgToStochVec(demand);
 	
@@ -206,7 +206,7 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 	u8 c = 14;
 	u16 iter = 0;
 	char* str = malloc(50);
-	while(error > precision && c > 0 && iter < 200){ //the vectors must be stochastic and whatnot, so this value is a 0-1 precision scale.
+	while(error > precision && c > 0 && iter < maxIter){ //the vectors must be stochastic and whatnot, so this value is a 0-1 precision scale.
 		#pragma omp parallel for
 		for(int i=0; i<v0->n; i++){
 			double val = 0.0;
@@ -246,9 +246,11 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 		}
 
 		printf("err(%d)=%f\n", iter, error);
-		struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector);
-		sprintf(str, "output/gif/%d.bmp", iter);
-		writeImage(prog, str);
+		if(makeGif){
+			struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector);
+			sprintf(str, "output/gif/%d.bmp", iter);
+			writeImage(prog, str);
+		}
 		iter++;
 		//usleep(10000);
 	}
