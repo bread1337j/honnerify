@@ -17,6 +17,9 @@ int main(int argc, char** argv){
 
 	struct image* _target = loadImage(argv[1]);
 	struct image* source = loadImage(argv[2]);
+	if(_target->bytesPerPixel != source->bytesPerPixel){
+		printf("Bytes per pixel don't match, the output will be straight NONSENSE\n");
+	}
 
 	struct image* target = resizeImage(_target, source);
 	
@@ -31,7 +34,7 @@ int main(int argc, char** argv){
 	printf("\n");*/
 	
 	writeImage(source, "output/Source.bmp");
-	struct image* output = stinkhorn(source, target, 1, 1e-5);
+	struct image* output = stinkhorn(source, target, 0.1, 1e-5);
 
 	writeImage(target, "output/RescaledTarget.bmp");
 	//writeImage(_target, "output/_Sus.bmp");
