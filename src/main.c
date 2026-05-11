@@ -4,7 +4,7 @@
 
 #include <types.h>
 #include "image.h"
-#include "computation.h"
+#include "sinkhorn.h"
 
 
 
