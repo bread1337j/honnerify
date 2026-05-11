@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <string.h> //jarvis why the fuck is memcpy in string.h
 #include <unistd.h>
-#include <omp.h>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
 
 struct matrix {
 	u32 width;
@@ -207,7 +209,6 @@ struct image* stinkhorn(struct image* supply, struct image* demand, double reg, 
 	u16 iter = 0;
 	char* str = malloc(50);
 	while(error > precision && c > 0 && iter < maxIter){ //the vectors must be stochastic and whatnot, so this value is a 0-1 precision scale.
-		#pragma omp parallel for
 		for(int i=0; i<v0->n; i++){
 			double val = 0.0;
 			for(int j=0; j<v0->n; j++){

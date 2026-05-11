@@ -8,8 +8,11 @@ INCLUDE = include
 OUTPUT = output
 
 INCLUDES = -I$(INCLUDE)
-CFLAGS = $(INCLUDES) -lSDL3 -MMD -MP -lm -fopenmp -O3
+CFLAGS = $(INCLUDES) -MMD -MP -lm 
+CC = nvcc
 ARGS = -t SmallTarget.png -s SmallSrc.png
+
+
 
 DEPS := $(OBJECTS:.o=.d)
 
@@ -26,11 +29,11 @@ compile: $(TARGET)
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(BIN)
-	gcc $(CFLAGS) $(OBJECTS) -o $(TARGET) $(HEADERS)
+	$(CC) $(CFLAGS) $(OBJECTS) -o $(TARGET) 
 
 $(BUILD)/%.o: $(SRC)/%.c $(BUILD)
 	@mkdir -p $(@D)
-	gcc $(CFLAGS) -c -o $@ $< 
+	$(CC) $(CFLAGS) -c -o $@ $< 
 
 $(BUILD): 
 	@mkdir -p build
