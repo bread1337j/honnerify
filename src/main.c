@@ -17,7 +17,7 @@ int main(int argc, char** argv){
 	int maxIter = 100;
 	double reg = 0.1;
 	char* outputString = "output/Output.bmp";
-	int makeGif = 0;
+	u8 flags = 0;
 	for(int i=1; i<argc; i++){
 		if(!strcmp(argv[i], "-t")){
 			i+=1;
@@ -48,7 +48,7 @@ int main(int argc, char** argv){
 			}
 			sscanf(argv[i], "%f", &reg);
 		} else if(!strcmp(argv[i], "-g") || !strcmp(argv[i], "-gif")){
-			makeGif = 1;
+			flags |= MAKE_GIF_FLAG;
 		} else {
 			printf("Unknown argument %s\n", argv[i]);
 			exit(2);
@@ -82,7 +82,7 @@ int main(int argc, char** argv){
 	printf("\n");*/
 	
 	writeImage(source, "output/Source.bmp");
-	struct image* output = stinkhorn(source, target, reg, 1e-5, maxIter, makeGif);
+	struct image* output = sinkhorn(source, target, reg, 1e-5, maxIter, flags);
 
 	writeImage(target, "output/RescaledTarget.bmp");
 	//writeImage(_target, "output/_Sus.bmp");

@@ -3,5 +3,6 @@
 
 #include <types.h>
 
-void callSinkhornStep1(double* v, double* u, u32 len, u32 width, u32 height, u32 i, double reg);
+void callSinkhornStep1(double* v, double* u, double* a, double* b, u32 len, u32 width, u32 height, double reg);
+
 #endif
