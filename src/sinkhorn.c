@@ -121,7 +121,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j] * output->width;
 		}
 	}
-	double mult = supplyVector->n * 0.1;
+	double mult = supplyVector->n * 1;
 	for(int i=0; i<u0->n; i++){
 		u8* ptr0 = (u8*)supply->data+(i*supply->bytesPerPixel);
 		for(int j=0; j<v0->n; j++){
@@ -234,7 +234,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 			c--;
 		}
 
-		printf("err(%d)=%f\n", iter, error);
+		//printf("err(%d)=%f\n", iter, error);
 		if(makeGif){
 			struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector);
 			sprintf(str, "output/gif/%d.bmp", iter);
@@ -243,6 +243,8 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 		iter++;
 	}
 	
+	//printVector(u0);
+	//printVector(v0);
 
 	return createImage(supply, demand, u0, v0, reg, supplyVector);
 }
@@ -280,8 +282,8 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 		printf("Iteration %d\n", iter);
 		iter++;
 	}
-	printVector(u0);
-	printVector(v0);
+	//printVector(u0);
+	//printVector(v0);
 	return createImage(supply, demand, u0, v0, reg, supplyVector);
 }
 #define MAKE_GIF_FLAG (1<<0)
