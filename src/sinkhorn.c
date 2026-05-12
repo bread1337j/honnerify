@@ -33,11 +33,14 @@ void printVector(struct vectorN* vec){
 	printf("%f>\n", vec->data[vec->n-1]);
 }
 
-struct vectorN* imgToStochVec(struct image* img){
+struct vectorN* imgToStochVec(struct image* img, double* buffer){
 	struct vectorN* out = (struct vectorN*) malloc(sizeof(struct vectorN));
 	out->n = img->width * img->height;
-	out->data = (double*)malloc(sizeof(double)*(out->n+1));
-	out->data++;
+	if(buffer == NULL){
+		out->data = (double*)malloc(sizeof(double)*(out->n));
+	}else{
+		out->data = buffer;
+	}
 	double sum = 0; 
 	u8* ptr = (u8*)img->data;
 	for(int i=0; i<out->n; i++){
@@ -49,7 +52,6 @@ struct vectorN* imgToStochVec(struct image* img){
 	for(int i=0; i<out->n; i++){
 		out->data[i] = out->data[i] / sum;
 	}
-	out->data[-1] = sum; //I am in the TRENCHES dawg 
 	
 	return out;
 }
@@ -119,7 +121,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j] * output->width;
 		}
 	}
-	double mult = supplyVector->n * 0.9;
+	double mult = supplyVector->n * 0.1;
 	for(int i=0; i<u0->n; i++){
 		u8* ptr0 = (u8*)supply->data+(i*supply->bytesPerPixel);
 		for(int j=0; j<v0->n; j++){
@@ -175,9 +177,8 @@ double inlineGibbsVal(u32 width, u32 height, u32 i, u32 j, double reg){
 
 // well this stinks 
 struct image* stinkhornCPU(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 makeGif){
-	struct vectorN* supplyVector = imgToStochVec(supply);
-	struct vectorN* demandVector = imgToStochVec(demand);
-	
+	struct vectorN* supplyVector = imgToStochVec(supply, NULL);
+	struct vectorN* demandVector = imgToStochVec(demand, NULL);
 	struct vectorN* u0 = (struct vectorN*)malloc(sizeof(struct vectorN)); 
 	struct vectorN* v0 = (struct vectorN*)malloc(sizeof(struct vectorN)); 
 	u0->n = supplyVector->n;
@@ -206,7 +207,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 			for(int j=0; j<v0->n; j++){
 				val += gibbsVal(supply, demand, j, i, reg)*u0->data[j];
 			}
-			callSinkhornStep1(v0->data, u0->data, supplyVector->data, demandVector->data, v0->n, supply->width, supply->height, reg);
+			//callSinkhornStep1(v0->data, u0->data, supplyVector->data, demandVector->data, v0->n, supply->width, supply->height, reg);
 			if(val > 1e-7){
 				v0->data[i] = demandVector->data[i] / (val);
 			}
@@ -246,12 +247,49 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 	return createImage(supply, demand, u0, v0, reg, supplyVector);
 }
 
+struct image* sinkhornCuda(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 makeGif){
+	double* buf1; double* buf2;
+	cu_createArr((void**)&(buf1),supply->width*supply->height*sizeof(double));
+	cu_createArr((void**)&(buf2),demand->width*demand->height*sizeof(double));
+	struct vectorN* supplyVector = imgToStochVec(supply, buf1);
+	struct vectorN* demandVector = imgToStochVec(demand, buf2);
+	struct vectorN* u0 = (struct vectorN*)malloc(sizeof(struct vectorN)); 
+	struct vectorN* v0 = (struct vectorN*)malloc(sizeof(struct vectorN)); 
+	u0->n = supplyVector->n;
+	v0->n = demandVector->n;
+	//printf("%p %p %p %p\n", u0->data, v0->data, supplyVector->data, demandVector->data);
+	cu_createArr((void**)&(u0->data), sizeof(double) * u0->n);
+	cu_createArr((void**)&(v0->data), sizeof(double) * v0->n);
+	
+	//printf("%p %p %d!=%lu\n", u0->data, v0->data, u0->n*sizeof(double), v0->data-u0->data); //padding moment trollface
+	
+	for(int i=0; i<u0->n; i++){
+		u0->data[i] = 1;
+		v0->data[i] = 1;
+	}
+	double error = 1.0 + precision;
+	double pError = error;
+	double dError = 1;
+	u8 c = 14;
+	u16 iter = 0;
+	char* str = (char*)malloc(50);
+	
+	while(iter < maxIter){ 
+		callSinkhornStep1(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
+		callSinkhornStep2(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
+		printf("Iteration %d\n", iter);
+		iter++;
+	}
+	printVector(u0);
+	printVector(v0);
+	return createImage(supply, demand, u0, v0, reg, supplyVector);
+}
 #define MAKE_GIF_FLAG (1<<0)
 #define CUDA_BACKEND_FLAG (1<<1)
 
 struct image* sinkhorn(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 flags){
 	if(flags&CUDA_BACKEND_FLAG) {
-		return NULL;
+		return sinkhornCuda(supply, demand, reg, precision, maxIter, flags&MAKE_GIF_FLAG);
 	}else{
 		return stinkhornCPU(supply, demand, reg, precision, maxIter, flags&MAKE_GIF_FLAG);
 	}
