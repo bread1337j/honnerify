@@ -16,10 +16,17 @@ ARGS = -t SmallTarget.png -s SmallSrc.png
 
 DEPS := $(OBJECTS:.o=.d)
 
-SOURCES := $(shell find $(SRC) -name '*.c')
+_SOURCES := $(shell find $(SRC) -name '*.c')
+CUSOURCES := $(shell find $(SRC) -name '*.cu')
 HEADERS := $(shell find $(SRC) -name '*.h')
 HEADERS := $(shell find $(INCLUDE) -name '*.h')
-OBJECTS = $(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(SOURCES))
+_OBJECTS = $(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(_SOURCES))
+CUOBJECTS = $(patsubst $(SRC)/%.cu, $(BUILD)/%.o, $(CUSOURCES))
+
+SOURCES = $(_SOURCES) $(CUSOURCES)
+OBJECTS = $(_OBJECTS) $(CUOBJECTS)
+
+
 
 run: compile $(OUTPUT)
 	./$(TARGET) $(ARGS)
@@ -27,13 +34,21 @@ run: compile $(OUTPUT)
 compile: $(TARGET)
 	@echo $(OBJECTS)
 
+test: 
+	@echo $(SOURCES)
+	@echo $(OBJECTS)
+
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(BIN)
-	$(CC) $(CFLAGS) $(OBJECTS) -o $(TARGET) 
+	nvcc $(CFLAGS) $(OBJECTS) -o $(TARGET) 
 
 $(BUILD)/%.o: $(SRC)/%.c $(BUILD)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c -o $@ $< 
+	gcc $(CFLAGS) -c -o $@ $< 
+
+$(BUILD)/%.o: $(SRC)/%.cu $(BUILD)
+	@mkdir -p $(@D)
+	nvcc $(CFLAGS) -c -o $@ $< 
 
 $(BUILD): 
 	@mkdir -p build

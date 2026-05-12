@@ -16,20 +16,20 @@ struct image {
 };
 
 struct image* loadImage(char* path){
-	struct image* out = malloc(sizeof(struct image));
+	struct image* out = (struct image*) malloc(sizeof(struct image));
 	out->data=stbi_load(path, &out->width, &out->height, &out->bytesPerPixel, 3);
 	printf("Bytes per pixel: %d\n", out->bytesPerPixel);
 	return out;
 }
 
 struct image* resizeImage(struct image* orig, struct image* target){
-	struct image* out = malloc(sizeof(struct image));
+	struct image* out = (struct image*) malloc(sizeof(struct image));
 	out->width = target->width, 
 	out->height = target->height,
 	out->bytesPerPixel = target->bytesPerPixel;
 	
 
-	out->data = stbir_resize_uint8_srgb(orig->data, orig->width, orig->height, 0,
+	out->data = (void*)stbir_resize_uint8_srgb(orig->data, orig->width, orig->height, 0,
 										0, out->width, out->height, 0, STBIR_RGB);
 
 	return out;
