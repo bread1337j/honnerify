@@ -122,7 +122,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 		}
 	}*/
 
-	double mult = supplyVector->n * 0.5;
+	double mult = supplyVector->n * 1;
 	for(int i=0; i<u0->n; i++){
 		u8* ptr0 = (u8*)supply->data+(i*supply->bytesPerPixel);
 		for(int j=0; j<v0->n; j++){
@@ -148,6 +148,28 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 			sum_demand += buffer_demand[i*output->bytesPerPixel+j];
 		}
 	}
+	printf("total supply mass post-calc: %d\n", sum_supply);
+	printf("total demand mass post-calc: %d\n", sum_demand);
+	printf("Total mass post-calc: %d\n", sum_supply+sum_demand);
+	sum_supply = 0;
+	sum_demand = 0;
+	u32 total_mass = 0;
+
+	double descaler = 1;
+
+	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
+		double pixelVal = ceil(buffer_demand[i]+buffer_supply[i]);
+		if(pixelVal > 255){
+			pixelVal = 255;
+		}else if(pixelVal < 0){
+			pixelVal = 0;
+		}
+		sum_supply+=*(((u8*)supply->data+i));
+		sum_demand+=(u8)pixelVal;
+	}
+
+	descaler = (double)sum_supply / sum_demand;
+	printf("descaling constant: %d/%d=%f\n", sum_supply, sum_demand, descaler);
 	sum_supply = 0;
 	sum_demand = 0;
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
@@ -157,14 +179,15 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 		}else if(pixelVal < 0){
 			pixelVal = 0;
 		}
-		*((u8*)(output->data)+i) = (u8)(pixelVal);
+		*((u8*)(output->data)+i) = (u8)(pixelVal)*descaler;
 
 		sum_supply+=*(((u8*)supply->data+i));
 		sum_demand+=*(((u8*)output->data+i));
+		total_mass += (u8)pixelVal;
 	}
-	printf("Total supply mass post-transform: %d\n", sum_supply);
-	printf("Total demand mass post-transform: %d\n", sum_demand);
-	printf("Total mass post-transform: %d\n", sum_supply+sum_demand);
+	printf("total supply mass post-transform: %d\n", sum_supply);
+	printf("total demand mass post-transform: %d\n", sum_demand);
+	printf("total mass post-transform: %d\n", total_mass);
 	return output;
 }
 
