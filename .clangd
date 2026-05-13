@@ -1,6 +1,6 @@
 CompileFlags:
   Add: 
-      - -I$(realpath include) # this doesn't work but I don't feel like sending my realpath to github so yk just fill it in yourself :)
+      - -I/home/johnskibidi/cw/honnerify/include 
       - -I/opt/cuda/include
       - -L/opt/cuda/lib64
       - --cuda-path=/opt/cuda
