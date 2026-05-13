@@ -36,5 +36,5 @@ struct image* resizeImage(struct image* orig, struct image* target){
 }
 
 void writeImage(struct image* img, char* path){
-	stbi_write_bmp(path, img->width, img->height, 3, img->data);//, img->bytesPerPixel);
+	stbi_write_png(path, img->width, img->height, 3, img->data, img->width*img->bytesPerPixel);
 }

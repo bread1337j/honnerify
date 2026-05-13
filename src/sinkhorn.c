@@ -130,9 +130,14 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j] * mult;
 			double* ptr1 = buffer_demand+(j*output->bytesPerPixel);
 			double* ptr2 = buffer_supply+(i*output->bytesPerPixel);
-			
 			for(int k=0; k<output->bytesPerPixel; k++){
 				double transport = (*(ptr0+k))*val;
+				if(*(ptr2+k) < transport){
+					transport = *(ptr2+k);
+				}
+				if(*(ptr1+k)+transport > 255){
+					transport = 255 - *(ptr1+k);
+				}
 				*(ptr1+k) += transport;
 				*(ptr2+k) -= transport;
 				
@@ -174,19 +179,19 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	sum_demand = 0;
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
+		pixelVal *= descaler;
 		if(pixelVal > 255){
 			pixelVal = 255;
 		}else if(pixelVal < 0){
 			pixelVal = 0;
 		}
-		*((u8*)(output->data)+i) = (u8)(pixelVal)*descaler;
+		*((u8*)(output->data)+i) = (u8)(pixelVal);
 
 		sum_supply+=*(((u8*)supply->data+i));
 		sum_demand+=*(((u8*)output->data+i));
 		total_mass += (u8)pixelVal;
 	}
-	printf("total supply mass post-transform: %d\n", sum_supply);
-	printf("total demand mass post-transform: %d\n", sum_demand);
+	printf("total output mass post-transform: %d\n", sum_demand);
 	printf("total mass post-transform: %d\n", total_mass);
 	return output;
 }

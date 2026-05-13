@@ -16,7 +16,7 @@ int main(int argc, char** argv){
 	struct image* source = NULL;//loadImage(argv[2]);
 	int maxIter = 100;
 	double reg = 0.1;
-	char* outputString = "output/Output.bmp";
+	char* outputString = "output/Output.png";
 	u8 flags = 0;
 	for(int i=1; i<argc; i++){
 		if(!strcmp(argv[i], "-t")){
@@ -83,10 +83,10 @@ int main(int argc, char** argv){
 	}
 	printf("\n");*/
 	
-	writeImage(source, "output/Source.bmp");
+	writeImage(source, "output/Source.png");
 	struct image* output = sinkhorn(source, target, reg, 1e-5, maxIter, flags);
 
-	writeImage(target, "output/RescaledTarget.bmp");
+	writeImage(target, "output/RescaledTarget.png");
 	//writeImage(_target, "output/_Sus.bmp");
 	writeImage(output, outputString);
 
