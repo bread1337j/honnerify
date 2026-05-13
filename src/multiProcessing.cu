@@ -21,7 +21,7 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 			
 			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
-			cost = cost * (double)width;
+			cost *= (width);
 			val += exp(-1 * cost / reg) * u[j];
 		}
 		if(val > 1e-7){
@@ -45,7 +45,7 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 			
 			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
-			cost = cost * (double)width;
+			cost *= (width);
 			val += exp(-1 * cost / reg) * v[j];
 		}
 		if(val > 1e-7){
