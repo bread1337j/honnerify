@@ -10,7 +10,7 @@ OUTPUT = output
 INCLUDES = -I$(INCLUDE)
 CFLAGS = $(INCLUDES) -MMD -MP -lm 
 CC = nvcc
-ARGS = -t SmallTarget.png -s SmallSrc.png
+ARGS = -t SmallTarget.png -s SmallSrc.png -c
 
 
 

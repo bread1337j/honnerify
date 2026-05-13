@@ -49,6 +49,8 @@ int main(int argc, char** argv){
 			sscanf(argv[i], "%f", &reg);
 		} else if(!strcmp(argv[i], "-g") || !strcmp(argv[i], "-gif")){
 			flags |= MAKE_GIF_FLAG;
+		} else if(!strcmp(argv[i], "-c") || !strcmp(argv[i], "-cuda")){
+			flags |= CUDA_BACKEND_FLAG;
 		} else {
 			printf("Unknown argument %s\n", argv[i]);
 			exit(2);
