@@ -1,8 +1,0 @@
-CompileFlags:
-  Add: 
-      - -I/home/johnskibidi/cw/honnerify/include 
-      - -I/opt/cuda/include
-      - -L/opt/cuda/lib64
-      - --cuda-path=/opt/cuda
-      - --cuda-gpu-arch=sm_61
-      
