@@ -46,7 +46,7 @@ int main(int argc, char** argv){
 				printf("Not enough arguments for parameter %s", argv[i-1]);
 				exit(2);
 			}
-			sscanf(argv[i], "%f", &reg);
+			sscanf(argv[i], "%lf", &reg);
 		} else if(!strcmp(argv[i], "-g") || !strcmp(argv[i], "-gif")){
 			flags |= MAKE_GIF_FLAG;
 		} else if(!strcmp(argv[i], "-c") || !strcmp(argv[i], "-cuda")){

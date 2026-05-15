@@ -7,6 +7,7 @@
 
 
 __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
+	//printf("%f\n", reg);
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 	int stride = blockDim.x * gridDim.x;
 	for(int i=index; i<len; i+=stride){
@@ -55,6 +56,53 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 
 }
 
+__global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int stride = blockDim.x * gridDim.x;
+	for(int i=index; i<len; i++){
+		u8* ptr0 = supply+(i*bytesPerPixel);
+		for(int j=0; j<len; j++){
+			double p0_x = (double)(i % width) / (double)width;
+			double p0_y = (double)(i / width) / (double)width;
+			
+			double p1_x = (double)(j % width) / (double)width;
+			double p1_y = (double)(j / width) / (double)width;
+
+			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
+			
+			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
+			cost *= (width);
+			double val = exp(-1 * cost / reg) * v[j] * u[i] * mult;
+			double* ptr1 = b+(j*bytesPerPixel);
+			double* ptr2 = a+(i*bytesPerPixel);
+			for(int k=0; k<bytesPerPixel; k++){
+				double transport = (*(ptr0+k))*val;
+				if(*(ptr2+k) < transport){
+					transport = *(ptr2+k);
+				}
+				if(*(ptr1+k)+transport > 255){
+					transport = 255 - *(ptr1+k);
+				}
+				*(ptr1+k) += transport;
+				*(ptr2+k) -= transport;
+				
+			}
+
+		}
+	}
+}
+
+__global__ void zeroOneCopyAnother(double* zero, double* target, u8* src, u8 bytesPerPixel, u32 len){
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int stride = blockDim.x * gridDim.x;
+	for(int i=index; i<len; i++){
+		for(int j=0; j<bytesPerPixel; j++){
+			zero[i*bytesPerPixel+j] = 0;
+			target[i*bytesPerPixel+j] = src[i*bytesPerPixel+j];
+		}
+	}
+}
+
 
 __global__ void nothing(){
 	printf("Hello from thread %d\n", threadIdx.x);
@@ -80,4 +128,16 @@ extern "C" void callSinkhornStep2(double* u, double* v, double* a, double* b, u3
 
 extern "C" void cu_createArr(void** ptr, u32 len){
 	cudaMallocManaged(ptr, len);
+}
+
+extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
+	int blockSize = 256;
+	int numBlocks = (len + blockSize-1) / blockSize;
+	
+	zeroOneCopyAnother<<<numBlocks, blockSize>>>(a, b, supply, bytesPerPixel, len);
+
+
+	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, demand, reg, mult, len, width, bytesPerPixel);
+
+
 }

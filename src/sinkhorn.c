@@ -101,7 +101,7 @@ double gibbsVal(const struct image* img0, const struct image* img1, u32 i, u32 j
 
 #define EPSILON 1e-10
 
-struct image* createImage(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector){
+struct image* createImageCPU(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector){
 	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
 	double* buffer_demand = (double*)calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
 	double* buffer_supply = (double*)malloc(output->bytesPerPixel * sizeof(double) * output->width * output->height);
@@ -268,7 +268,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 
 		//printf("err(%d)=%f\n", iter, error);
 		if(makeGif){
-			struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector);
+			struct image* prog = createImageCPU(supply, demand, u0, v0, reg, supplyVector);
 			sprintf(str, "output/gif/%d.bmp", iter);
 			writeImage(prog, str);
 		}
@@ -278,7 +278,56 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 	//printVector(u0);
 	//printVector(v0);
 
-	return createImage(supply, demand, u0, v0, reg, supplyVector);
+	return createImageCPU(supply, demand, u0, v0, reg, supplyVector);
+}
+
+struct image* createImage(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector){
+	struct image* output = malloc(sizeof(struct image));
+	output->width = supply->width; 
+	output->height = supply->height; 
+	output->bytesPerPixel = supply->bytesPerPixel;
+	
+	double* buffer_demand; 
+	double* buffer_supply;
+
+	cu_createArr(&output->data, sizeof(u8)*output->width*output->height*output->bytesPerPixel);
+	cu_createArr((void**)&buffer_demand, output->bytesPerPixel * sizeof(double) * output->width * output->height);
+	cu_createArr((void**)&buffer_supply, output->bytesPerPixel * sizeof(double) * output->width * output->height);
+	
+	double mult = supplyVector->n*1;
+
+	cu_naiveImageCreation(u0->data, v0->data, buffer_supply, buffer_demand, supply->data, demand->data, reg, mult, u0->n, supply->width, supply->bytesPerPixel);
+	double sum_supply = 0;
+	double sum_demand = 0;
+	u32 total_mass = 0;
+
+	double descaler = 1;
+
+	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
+		double pixelVal = ceil(buffer_demand[i]+buffer_supply[i]);
+		if(pixelVal > 255){
+			pixelVal = 255;
+		}else if(pixelVal < 0){
+			pixelVal = 0;
+		}
+		sum_supply+=*(((u8*)supply->data+i));
+		sum_demand+=(u8)pixelVal;
+	}
+
+	descaler = (double)sum_supply / sum_demand;
+	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
+		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
+		pixelVal *= descaler;
+		if(pixelVal > 255){
+			pixelVal = 255;
+		}else if(pixelVal < 0){
+			pixelVal = 0;
+		}
+		*((u8*)(output->data)+i) = (u8)(pixelVal);
+	}
+
+	return output;
+
 }
 
 struct image* sinkhornCuda(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 makeGif){
