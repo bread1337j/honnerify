@@ -12,9 +12,9 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 	int stride = blockDim.x * gridDim.x;
 	for(int i=index; i<len; i+=stride){
 		double val = 0.0;
+		double p0_x = (double)(i % width) / (double)width;
+		double p0_y = (double)(i / width) / (double)width;
 		for(int j=0; j<len; j++){
-			double p0_x = (double)(i % width) / (double)width;
-			double p0_y = (double)(i / width) / (double)width;
 			
 			double p1_x = (double)(j % width) / (double)width;
 			double p1_y = (double)(j / width) / (double)width;
@@ -23,7 +23,7 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 			
 			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
 			cost *= (width);
-			val += exp(-1 * cost / reg) * u[j];
+			val += __expf(-1 * cost / reg) * u[j];
 		}
 		if(val > 1e-7){
 			v[i] = b[i] / val;
@@ -36,9 +36,9 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 	int stride = blockDim.x * gridDim.x;
 	for(int i=index; i<len; i+=stride){
 		double val = 0.0;
+		double p0_x = (double)(i % width) / (double)width;
+		double p0_y = (double)(i / width) / (double)width;
 		for(int j=0; j<len; j++){ //since the cost is just distance, it should be symmetric, thus C^T=C
-			double p0_x = (double)(i % width) / (double)width;
-			double p0_y = (double)(i / width) / (double)width;
 			
 			double p1_x = (double)(j % width) / (double)width;
 			double p1_y = (double)(j / width) / (double)width;
@@ -47,7 +47,7 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 			
 			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
 			cost *= (width);
-			val += exp(-1 * cost / reg) * v[j];
+			val += __expf(-1 * cost / reg) * v[j];
 		}
 		if(val > 1e-7){
 			u[i] = a[i] / val;
@@ -56,43 +56,52 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 
 }
 
-__global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
+__device__ void atomicAddDouble(double* address, double val) {
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val + __longlong_as_double(assumed)));
+    } while (assumed != old);
+}
+
+
+__global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, double* supplySubtractor9000, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
 	//pretty much step 3 tbh
+	int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
-	int stride = blockDim.x * gridDim.x;
+	double p1_x = (double) (j%width) / (double) width;
+	double p1_y = (double) (j/width) / (double) width;
+	double* ptr1 = b + (j * bytesPerPixel);
+
 	for(int i=0; i<len; i++){
-		u8* ptr0 = supply+(i*bytesPerPixel);
-		for(int j=index; j<len; j+=stride){
-			double p0_x = (double)(i % width) / (double)width;
-			double p0_y = (double)(i / width) / (double)width;
-			
-			double p1_x = (double)(j % width) / (double)width;
-			double p1_y = (double)(j / width) / (double)width;
+		double p0_x = (double) (i%width) / (double) width;
+		double p0_y = (double) (i/width) / (double) width;
 
-			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
+		double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
+		cost *= width;
+		double val = __expf(-1 * cost / reg) * v[j] * u[i] * mult;
 			
-			cost *= (width);
-			double val = exp(-1 * cost / reg) * v[j] * u[i] * mult;
-			double* ptr1 = b+(j*bytesPerPixel);
-			double* ptr2 = a+(i*bytesPerPixel);
-			for(int k=0; k<bytesPerPixel; k++){
-				double transport = (*(ptr0+k))*val;
-				if(*(ptr2+k) < transport){
-					transport = *(ptr2+k);
-				}
-				if(*(ptr1+k)+transport > 255){
-					transport = 255 - *(ptr1+k);
-				}
-				*(ptr1+k) += transport;
-				*(ptr2+k) -= transport;
-				//some bs race condition happens here. 
-				//its a bug not a feature trust (the final version will surely not use this algorithm to distribute the pixels)
-			}
+		for(int k=0; k<bytesPerPixel; k++){
+			double transport = ((double)supply[i*bytesPerPixel + k]) * val;
+			transport = fmin(transport, supply[i*bytesPerPixel+k]);
+			transport = fmin(transport, 255.0-ptr1[k]);
+			
+			ptr1[k] += transport; 
 
+			atomicAddDouble(&supplySubtractor9000[i*bytesPerPixel+k], transport);
 		}
 	}
 }
+
+__global__ void subtractSupply(double* supply, double* supplySubtractor9000, u32 len, u8 bytesPerPixel){
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+	for (int k=0; k<bytesPerPixel; k++){
+		supply[index*bytesPerPixel+k] -= supplySubtractor9000[index*bytesPerPixel+k];
+	}
+}
+
 
 __global__ void zeroOneCopyAnother(double* zero, double* target, u8* src, u8 bytesPerPixel, u32 len){
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -129,7 +138,10 @@ extern "C" void callSinkhornStep2(double* u, double* v, double* a, double* b, u3
 
 
 extern "C" void cu_createArr(void** ptr, u32 len){
-	cudaMallocManaged(ptr, len);
+	cudaError_t err = cudaMallocManaged(ptr, len);
+	if(err != cudaSuccess){
+		fprintf(stderr, "Epic cuda malloc fail: %s\n", cudaGetErrorString(err));
+	}
 }
 
 extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
@@ -143,9 +155,20 @@ extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b
 		printf(" %f=%hd ", a[i], supply[i]);
 	}
 	printf("\n");*/
+	
+	double* supplySubtractor9000; 
+	cudaMalloc(&supplySubtractor9000, len*bytesPerPixel*sizeof(double));
+	cudaMemset(supplySubtractor9000, 0, len*bytesPerPixel*sizeof(double));
 
-	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, demand, reg, mult, len, width, bytesPerPixel);
+	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, supplySubtractor9000, reg, mult, len, width, bytesPerPixel);
     cudaDeviceSynchronize();
+
+	subtractSupply<<<numBlocks, blockSize>>>(a, supplySubtractor9000, len, bytesPerPixel);
+    cudaDeviceSynchronize();
+
+	
+	cudaFree(supplySubtractor9000);
+
 	/*
 	for(int i=0; i<len*bytesPerPixel; i++){
 		printf(" %d ", supply[i]);

@@ -48,7 +48,7 @@ $(BUILD)/%.o: $(SRC)/%.c $(BUILD)
 
 $(BUILD)/%.o: $(SRC)/%.cu $(BUILD)
 	@mkdir -p $(@D)
-	nvcc $(CFLAGS) -c -o $@ $< 
+	nvcc $(CFLAGS) -c -o $@ $< --expt-relaxed-constexpr
 
 $(BUILD): 
 	@mkdir -p build

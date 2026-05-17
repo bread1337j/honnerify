@@ -321,6 +321,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	
 	descaler = (double)sum_supply / sum_demand;
 	printf("Descaler=%f\n", descaler);
+	u32 sum_output = 0;
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
 		pixelVal *= descaler;
@@ -330,7 +331,10 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 			pixelVal = 0;
 		}
 		*((u8*)(output->data)+i) = (u8)(pixelVal);
+		sum_output += (u8)pixelVal;
 	}
+	
+	printf("Final output mass: %d\n", sum_output);
 
 	return output;
 
