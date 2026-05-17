@@ -164,6 +164,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal = ceil(buffer_demand[i]+buffer_supply[i]);
+		//printf(" d%.1fs%.1f ", buffer_demand[i], buffer_supply[i]);
 		if(pixelVal > 255){
 			pixelVal = 255;
 		}else if(pixelVal < 0){
@@ -172,7 +173,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		sum_supply+=*(((u8*)supply->data+i));
 		sum_demand+=(u8)pixelVal;
 	}
-
+	printf("\n");
 	descaler = (double)sum_supply / sum_demand;
 	printf("descaling constant: %d/%d=%f\n", sum_supply, sum_demand, descaler);
 	sum_supply = 0;
@@ -305,6 +306,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal = ceil(buffer_demand[i]+buffer_supply[i]);
+		//printf(" d%.1fs%.1f ", buffer_demand[i], buffer_supply[i]);
 		if(pixelVal > 255){
 			pixelVal = 255;
 		}else if(pixelVal < 0){
@@ -313,8 +315,12 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 		sum_supply+=*(((u8*)supply->data+i));
 		sum_demand+=(u8)pixelVal;
 	}
-
+	printf("\n");
+	printf("total supply mass: %f\n", sum_supply); //everything breaks without this print statement. I don't know why.,, 
+	printf("total output mass post-calc: %f\n", sum_demand);
+	
 	descaler = (double)sum_supply / sum_demand;
+	printf("Descaler=%f\n", descaler);
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
 		pixelVal *= descaler;
@@ -366,6 +372,7 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 	//printVector(u0);
 	//printVector(v0);
 	return createImage(supply, demand, u0, v0, reg, supplyVector);
+	//return createImageCPU(supply, demand, u0, v0, reg, supplyVector);
 }
 #define MAKE_GIF_FLAG (1<<0)
 #define CUDA_BACKEND_FLAG (1<<1)

@@ -57,11 +57,13 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 }
 
 __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
+	//pretty much step 3 tbh
+
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 	int stride = blockDim.x * gridDim.x;
-	for(int i=index; i<len; i++){
+	for(int i=0; i<len; i++){
 		u8* ptr0 = supply+(i*bytesPerPixel);
-		for(int j=0; j<len; j++){
+		for(int j=index; j<len; j+=stride){
 			double p0_x = (double)(i % width) / (double)width;
 			double p0_y = (double)(i / width) / (double)width;
 			
@@ -70,7 +72,6 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 			
-			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
 			cost *= (width);
 			double val = exp(-1 * cost / reg) * v[j] * u[i] * mult;
 			double* ptr1 = b+(j*bytesPerPixel);
@@ -85,7 +86,8 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 				}
 				*(ptr1+k) += transport;
 				*(ptr2+k) -= transport;
-				
+				//some bs race condition happens here. 
+				//its a bug not a feature trust (the final version will surely not use this algorithm to distribute the pixels)
 			}
 
 		}
@@ -95,7 +97,7 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 __global__ void zeroOneCopyAnother(double* zero, double* target, u8* src, u8 bytesPerPixel, u32 len){
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 	int stride = blockDim.x * gridDim.x;
-	for(int i=index; i<len; i++){
+	for(int i=index; i<len; i+=stride){
 		for(int j=0; j<bytesPerPixel; j++){
 			zero[i*bytesPerPixel+j] = 0;
 			target[i*bytesPerPixel+j] = src[i*bytesPerPixel+j];
@@ -134,10 +136,29 @@ extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
 	
-	zeroOneCopyAnother<<<numBlocks, blockSize>>>(a, b, supply, bytesPerPixel, len);
-
+	zeroOneCopyAnother<<<numBlocks, blockSize>>>(b, a, supply, bytesPerPixel, len);
+    cudaDeviceSynchronize();
+	
+	/*for(int i=0; i<len*bytesPerPixel; i++){
+		printf(" %f=%hd ", a[i], supply[i]);
+	}
+	printf("\n");*/
 
 	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, demand, reg, mult, len, width, bytesPerPixel);
+    cudaDeviceSynchronize();
+	/*
+	for(int i=0; i<len*bytesPerPixel; i++){
+		printf(" %d ", supply[i]);
+	}
+	printf("\n");
+	for(int i=0; i<len*bytesPerPixel; i++){
+		printf(" %.1f ", a[i]);
+	}
 
-
+	printf("\n->\n");
+	for(int i=0; i<len*bytesPerPixel; i++){
+		printf(" %.1f ", b[i]);
+	}
+	printf("\n");
+*/
 }
