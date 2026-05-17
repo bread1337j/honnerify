@@ -270,7 +270,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 		//printf("err(%d)=%f\n", iter, error);
 		if(makeGif){
 			struct image* prog = createImageCPU(supply, demand, u0, v0, reg, supplyVector);
-			sprintf(str, "output/gif/%d.bmp", iter);
+			sprintf(str, "output/gif/%d.png", iter);
 			writeImage(prog, str);
 		}
 		iter++;
@@ -372,6 +372,11 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 		callSinkhornStep2(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
 		printf("Iteration %d\n", iter);
 		iter++;
+		if(makeGif){
+			struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector);
+			sprintf(str, "output/gif/%04d.png", iter);
+			writeImage(prog, str);
+		}
 	}
 	//printVector(u0);
 	//printVector(v0);

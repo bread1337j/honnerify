@@ -85,8 +85,15 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 			
 		for(int k=0; k<bytesPerPixel; k++){
 			double transport = ((double)supply[i*bytesPerPixel + k]) * val;
-			transport = fmin(transport, supply[i*bytesPerPixel+k]);
-			transport = fmin(transport, 255.0-ptr1[k]);
+			//transport = fmin(transport, supply[i*bytesPerPixel+k]);
+			//transport = fmin(transport, 255.0-ptr1[k]);
+			if(transport > supply[i*bytesPerPixel+k]){
+				transport = supply[i*bytesPerPixel+k];
+			}
+			if(transport > 255-(*ptr1)){
+				transport = 255-(*ptr1);
+			}
+
 			
 			ptr1[k] += transport; 
 
