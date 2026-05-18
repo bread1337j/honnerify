@@ -152,6 +152,7 @@ extern "C" void cu_createArr(void** ptr, u32 len){
 }
 
 extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
+    cudaDeviceSynchronize();
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
 	

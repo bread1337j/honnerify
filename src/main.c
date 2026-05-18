@@ -51,6 +51,8 @@ int main(int argc, char** argv){
 			flags |= MAKE_GIF_FLAG;
 		} else if(!strcmp(argv[i], "-c") || !strcmp(argv[i], "-cuda")){
 			flags |= CUDA_BACKEND_FLAG;
+		}else if(!strcmp(argv[i], "-R") || !strcmp(argv[i], "-Recursive")){
+			flags |= RECURSIVE_IMAGE_FLAG;
 		} else {
 			printf("Unknown argument %s\n", argv[i]);
 			exit(2);
