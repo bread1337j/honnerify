@@ -10,6 +10,7 @@ OUTPUT = output
 INCLUDES = -I$(INCLUDE)
 CFLAGS = $(INCLUDES) -MMD -MP -lm 
 CC = nvcc
+#Total hip obliteration.
 ARGS = -t SmallTarget.png -s SmallSrc.png -c
 
 
