@@ -47,7 +47,7 @@ struct vectorN* imgToStochVec(struct image* img, double* buffer){
 	double sum = 0; 
 	u8* ptr = (u8*)img->data;
 	for(int i=0; i<out->n; i++){
-		out->data[i] = 0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)) / 255; 
+		out->data[i] = (1+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)));
 		//out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) * (*(ptr+i*3+1)) * (*(ptr+i*3+1)) * (*(ptr+i*3+2)) * (*(ptr+i*3+2)); 
 		sum += out->data[i];
 	}
@@ -90,12 +90,13 @@ double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u3
 
 	double dPos = (p0.x-p1.x)*(p0.x-p1.x) + (p0.y-p1.y)*(p0.y-p1.y);
 
-    return img0->width*dPos;
+    return dPos;
 }
 
 
 
 double gibbsVal(const struct image* img0, const struct image* img1, u32 i, u32 j, double reg){
+	//return imgCalcCost(img0, img1, i, j);
 	return exp(-1*imgCalcCost(img0, img1, i, j)/reg);
 }
 
@@ -118,23 +119,35 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		}
 	}
 	printf("Total supply mass pre-transform: %d\n", sum_supply);
-
-	/*for(int i=0; i<u0->n; i++){
+/*
+	for(int i=0; i<u0->n; i++){
 		for(int j=0; j<v0->n; j++){
-			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j] * output->width;
+			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
+			printf(" %f ", val);
 		}
-	}*/
+		printf("\n");
+	}
 
-	double mult = supplyVector->n * 1;
+	for(int i=0; i<u0->n; i++){
+		printf(" %f ", supplyVector->data[i]);
+	}
+*/
 	for(int i=0; i<u0->n; i++){
 		u8* ptr0 = (u8*)supply->data+(i*supply->bytesPerPixel);
+		double rowSum = 0;
 		for(int j=0; j<v0->n; j++){
 			//calculate the transport plan matrix at this entry ij
-			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j] * mult;
+			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
+			//printf(" %f ", val);
+			rowSum+=val;
 			double* ptr1 = buffer_demand+(j*output->bytesPerPixel);
 			double* ptr2 = buffer_supply+(i*output->bytesPerPixel);
 			for(int k=0; k<output->bytesPerPixel; k++){
-				double transport = (*(ptr0+k))*val;
+				double transport = (*(ptr0+k))*(val/supplyVector->data[i]);
+			/*	if(transport > 1e-4){
+					printf("t%f\n", transport);
+
+				}*/
 				if(*(ptr2+k) < transport){
 					transport = *(ptr2+k);
 				}
@@ -147,6 +160,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 			}
 
 		}
+		//printf("\n%f\n", rowSum);
 	}
 	sum_supply = 0;
 	u32 sum_demand = 0;
@@ -156,6 +170,19 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 			sum_demand += buffer_demand[i*output->bytesPerPixel+j];
 		}
 	}
+	/*
+	printf("\nbuf supply:\n");
+	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
+		printf(" %f ", buffer_supply[i]);
+	}
+	printf("\nbuf demand:\n");
+	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
+		printf(" %f ", buffer_demand[i]);
+	}
+	printf("\n");
+*/
+
+
 	printf("total supply mass post-calc: %d\n", sum_supply);
 	printf("total demand mass post-calc: %d\n", sum_demand);
 	printf("Total mass post-calc: %d\n", sum_supply+sum_demand);
@@ -176,11 +203,12 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		sum_supply+=*(((u8*)supply->data+i));
 		sum_demand+=(u8)pixelVal;
 	}
-	printf("\n");
+	//printf("\n");
 	descaler = (double)sum_supply / sum_demand;
 	printf("descaling constant: %d/%d=%f\n", sum_supply, sum_demand, descaler);
 	sum_supply = 0;
 	sum_demand = 0;
+	//printf("Out: \n");
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
 		pixelVal *= descaler;
@@ -190,21 +218,19 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 			pixelVal = 0;
 		}
 		*((u8*)(output->data)+i) = (u8)(pixelVal);
-
+		//printf(" %f ", pixelVal);
 		sum_supply+=*(((u8*)supply->data+i));
 		sum_demand+=*(((u8*)output->data+i));
 		total_mass += (u8)pixelVal;
 	}
+	//printf("\n");
+
 	printf("total output mass post-transform: %d\n", sum_demand);
 	printf("total mass post-transform: %d\n", total_mass);
 	return output;
 }
 
 
-double inlineGibbsVal(u32 width, u32 height, u32 i, u32 j, double reg){
-	double cost = (i%width - j%width) * (i%width - j%width) + (i/width - j/width) * (i/width - j/width);
-	return exp(-1*cost/reg);
-}
 
 
 
@@ -231,7 +257,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 	double error = 1.0 + precision;
 	double pError = error;
 	double dError = 1;
-	u8 c = 14;
+	u8 c = 140;
 	u16 iter = 0;
 	char* str = (char*)malloc(50);
 
@@ -243,7 +269,6 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 			for(int j=0; j<v0->n; j++){
 				val += gibbsVal(supply, demand, j, i, reg)*u0->data[j];
 			}
-			//callSinkhornStep1(v0->data, u0->data, supplyVector->data, demandVector->data, v0->n, supply->width, supply->height, reg);
 			if(val > 1e-7){
 				v0->data[i] = demandVector->data[i] / (val);
 			}
@@ -288,6 +313,10 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 		iter++;
 	}
 	
+	//printf("In: \n");
+	//printVector(supplyVector);
+	//printVector(demandVector);
+
 	//printVector(u0);
 	//printVector(v0);
 
@@ -307,15 +336,23 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	cu_createArr((void**)&buffer_demand, output->bytesPerPixel * sizeof(double) * output->width * output->height);
 	cu_createArr((void**)&buffer_supply, output->bytesPerPixel * sizeof(double) * output->width * output->height);
 	
-	double mult = supplyVector->n*0.5;
+	double mult = 1;//supplyVector->n*1.0;
 
-	cu_naiveImageCreation(u0->data, v0->data, buffer_supply, buffer_demand, supply->data, demand->data, reg, mult, u0->n, supply->width, supply->bytesPerPixel);
+	cu_naiveImageCreation(u0->data, v0->data, buffer_supply, buffer_demand, supply->data, demand->data, reg, mult, u0->n, supply->width, supply->bytesPerPixel, supplyVector->data);
 	double sum_supply = 0;
 	double sum_demand = 0;
 	u32 total_mass = 0;
-	
-	double descaler = 1;
 	/*
+	printf("\nbuf supply:\n");
+	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
+		printf(" %f ", buffer_supply[i]);
+	}
+	printf("\nbuf_demand:\n");
+	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
+		printf(" %f ", buffer_demand[i]);
+	}
+	printf("\n");
+	
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal = ceil(buffer_demand[i]+buffer_supply[i]);
 		//printf(" d%.1fs%.1f ", buffer_demand[i], buffer_supply[i]);

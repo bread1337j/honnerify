@@ -23,7 +23,8 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 			
 			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
 			cost *= (width);
-			val += __expf(-1 * cost / reg) * u[j];
+			//val += __expf(-1 * cost / reg) * u[j];
+			val += exp(-1 * cost / reg) * u[j];
 		}
 		if(val > 1e-7){
 			v[i] = b[i] / val;
@@ -46,8 +47,10 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 			
 			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
+		
 			cost *= (width);
-			val += __expf(-1 * cost / reg) * v[j];
+			//val += __expf(-1 * cost / reg) * v[j];
+			val += exp(-1 * cost / reg) * v[j];
 		}
 		if(val > 1e-7){
 			u[i] = a[i] / val;
@@ -56,18 +59,9 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 
 }
 
-__device__ void atomicAddDouble(double* address, double val) {
-    unsigned long long int* address_as_ull = (unsigned long long int*)address;
-    unsigned long long int old = *address_as_ull, assumed;
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_ull, assumed,
-                        __double_as_longlong(val + __longlong_as_double(assumed)));
-    } while (assumed != old);
-}
 
 
-__global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, double* supplySubtractor9000, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
+__global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, double* supplySubtractor9000, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* sum, double* supplyVector){
 	//pretty much step 3 tbh
 	int j = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -81,25 +75,20 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 
 		double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 		cost *= width;
-		double val = __expf(-1 * cost / reg) * v[j] * u[i] * mult;
-			
+		//double val = __expf(-1 * cost / reg) * v[j] * u[i] * mult;
+		double val = exp(-1 * cost / reg) * v[j] * u[i];
+		//atomicAdd(sum, val);
 		for(int k=0; k<bytesPerPixel; k++){
-			double transport = ((double)supply[i*bytesPerPixel + k]) * val;
-			//transport = fmin(transport, supply[i*bytesPerPixel+k]);
-			//transport = fmin(transport, 255.0-ptr1[k]);
-			if(transport > supply[i*bytesPerPixel+k]){
-				transport = supply[i*bytesPerPixel+k];
-			}
-			if(transport > 255-(*ptr1)){
-				transport = 255-(*ptr1);
-			}
+			double transport = ((double)supply[i*bytesPerPixel + k]) * (val / supplyVector[i]);
+			transport = fmin(transport, (double)supply[i * bytesPerPixel + k]);
+			transport = fmin(transport, 255.0 - ptr1[k]);
 
 			
-			ptr1[k] += transport; 
-
-			atomicAddDouble(&supplySubtractor9000[i*bytesPerPixel+k], transport);
+			atomicAdd(ptr1+k, transport); 
+			atomicAdd(supplySubtractor9000+(i*3+k), transport);
 		}
 	}
+	//printf("\n");
 }
 
 __global__ void subtractSupply(double* supply, double* supplySubtractor9000, u32 len, u8 bytesPerPixel){
@@ -120,6 +109,9 @@ __global__ void zeroOneCopyAnother(double* zero, double* target, u8* src, u8 byt
 		}
 	}
 }
+
+
+
 
 
 __global__ void nothing(){
@@ -151,7 +143,7 @@ extern "C" void cu_createArr(void** ptr, u32 len){
 	}
 }
 
-extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel){
+extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* supplyVector){ //this shit....is so ass...
     cudaDeviceSynchronize();
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
@@ -167,15 +159,31 @@ extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b
 	double* supplySubtractor9000; 
 	cudaMalloc(&supplySubtractor9000, len*bytesPerPixel*sizeof(double));
 	cudaMemset(supplySubtractor9000, 0, len*bytesPerPixel*sizeof(double));
+	
+	double* sum; //the non-double stochasticness mechanism
+	cu_createArr((void**)&sum, sizeof(double));
+	
+	double* sVec;
 
-	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, supplySubtractor9000, reg, mult, len, width, bytesPerPixel);
+	cudaMallocManaged(&sVec, len*sizeof(double));
+	for(int i=0; i<len; i++){
+		sVec[i] = supplyVector[i]; //temporary code (spoiler alert it is staying this way,,
+	}
+	//cudaMemcpy(sVec, supplyVector, width*bytesPerPixel*sizeof(double), cudaMemcpyHostToDevice);
+
+	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, supplySubtractor9000, reg, mult, len, width, bytesPerPixel, sum, sVec);
     cudaDeviceSynchronize();
 
 	subtractSupply<<<numBlocks, blockSize>>>(a, supplySubtractor9000, len, bytesPerPixel);
     cudaDeviceSynchronize();
 
+
+	//printf("%f %d", *sum, width);
 	
 	cudaFree(supplySubtractor9000);
+	cudaFree(sum);
+	cudaFree(sVec);
+
 
 	/*
 	for(int i=0; i<len*bytesPerPixel; i++){
