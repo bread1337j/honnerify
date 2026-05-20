@@ -27,7 +27,8 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 			val += exp(-1 * cost / reg) * u[j];
 		}
 		if(val > 1e-7){
-			v[i] = b[i] / val;
+			//v[i] = b[i] / val;
+			v[i] = 1.0 / val;
 		}
 	}
 }
@@ -53,7 +54,8 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 			val += exp(-1 * cost / reg) * v[j];
 		}
 		if(val > 1e-7){
-			u[i] = a[i] / val;
+			//u[i] = a[i] / val;
+			u[i] = 1.0 / val;
 		}
 	}
 
@@ -126,6 +128,7 @@ __global__ void nothing(){
 extern "C" void callSinkhornStep1(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
+	//cudaMemPrefetchAsync(u, len*sizeof(double),0,0);
 	sinkhornStep1<<<numBlocks,blockSize>>>(u, v, a, b, len, width, height, reg);
     cudaDeviceSynchronize();
 }
