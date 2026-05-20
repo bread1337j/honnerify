@@ -80,9 +80,9 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 		//double val = __expf(-1 * cost / reg) * v[j] * u[i] * mult;
 		double val = exp(-1 * cost / reg) * v[j] * u[i];
 		//atomicAdd(sum, val);
-		if(val > 1e-4){
+		/*if(val > 1e-4){
 			printf(" %d %d %f \n", i, j, val);
-		}
+		}*/
 		for(int k=0; k<bytesPerPixel; k++){
 			double transport = ((double)supply[i*bytesPerPixel + k]) * (val / supplyVector[i]);
 			transport = fmin(transport, (double)supply[i * bytesPerPixel + k]);
@@ -128,7 +128,15 @@ __global__ void nothing(){
 extern "C" void callSinkhornStep1(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
-	//cudaMemPrefetchAsync(u, len*sizeof(double),0,0);
+	
+	int device = -1;
+	cudaGetDevice(&device);
+	struct cudaMemLocation sus = { .type = cudaMemLocationTypeDevice, .id = device};
+	cudaMemPrefetchAsync(u, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(v, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(a, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(b, len*sizeof(double), sus, device, 0);
+	
 	sinkhornStep1<<<numBlocks,blockSize>>>(u, v, a, b, len, width, height, reg);
     cudaDeviceSynchronize();
 }
@@ -136,6 +144,15 @@ extern "C" void callSinkhornStep1(double* u, double* v, double* a, double* b, u3
 extern "C" void callSinkhornStep2(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
+	/*
+	int device = -1;
+	cudaGetDevice(&device);
+	struct cudaMemLocation sus = { .type = cudaMemLocationTypeDevice, .id = device};
+	cudaMemPrefetchAsync(u, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(v, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(a, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(b, len*sizeof(double), sus, device, 0);
+	*/
 	sinkhornStep2<<<numBlocks,blockSize>>>(u, v, a, b, len, width, height, reg);
     cudaDeviceSynchronize();
 }
@@ -155,6 +172,16 @@ extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
 	
+	
+	int device = -1;
+	cudaGetDevice(&device);
+	struct cudaMemLocation sus = { .type = cudaMemLocationTypeDevice, .id = device};
+	cudaMemPrefetchAsync(u, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(v, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(a, len*sizeof(double), sus, device, 0);
+	cudaMemPrefetchAsync(b, len*sizeof(double), sus, device, 0);
+	
+
 	zeroOneCopyAnother<<<numBlocks, blockSize>>>(b, a, supply, bytesPerPixel, len);
     cudaDeviceSynchronize();
 	
