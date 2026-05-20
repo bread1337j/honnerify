@@ -49,6 +49,7 @@ struct vectorN* imgToStochVec(struct image* img, double* buffer){
 	for(int i=0; i<out->n; i++){
 		out->data[i] = (1+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)));
 		//out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) * (*(ptr+i*3+1)) * (*(ptr+i*3+1)) * (*(ptr+i*3+2)) * (*(ptr+i*3+2)); 
+		//out->data[i] = 1.0 / out->n;
 		sum += out->data[i];
 	}
 	
@@ -119,7 +120,19 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		}
 	}
 	printf("Total supply mass pre-transform: %d\n", sum_supply);
-/*
+	printf("u:\n");
+	printVector(u0);
+	printf("v:\n");
+	printVector(v0);
+	printf("K:\n");
+	for(int i=0; i<u0->n; i++){
+		for(int j=0; j<v0->n; j++){
+			double val = gibbsVal(supply, demand, i, j, reg);
+			printf(" %f ", val);
+		}
+		printf("\n");
+	}
+	printf("uKv:\n");
 	for(int i=0; i<u0->n; i++){
 		for(int j=0; j<v0->n; j++){
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
@@ -127,7 +140,16 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		}
 		printf("\n");
 	}
+	double rowSum = 0; double colSum = 0;
+	for(int i=0; i<u0->n; i++){
+		rowSum += gibbsVal(supply, demand, i, 0, reg)*u0->data[i]*v0->data[0];
+		colSum += gibbsVal(supply, demand, 0, i, reg)*u0->data[0]*v0->data[i];
+	}
 
+	printf("Sums: %f %f\n", rowSum, colSum);
+
+
+/*
 	for(int i=0; i<u0->n; i++){
 		printf(" %f ", supplyVector->data[i]);
 	}
@@ -136,6 +158,9 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		u8* ptr0 = (u8*)supply->data+(i*supply->bytesPerPixel);
 		double rowSum = 0;
 		for(int j=0; j<v0->n; j++){
+			if(supplyVector->data[i] < 1e-4){
+				continue;
+			}
 			//calculate the transport plan matrix at this entry ij
 			double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
 			//printf(" %f ", val);
@@ -170,7 +195,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 			sum_demand += buffer_demand[i*output->bytesPerPixel+j];
 		}
 	}
-	/*
+	
 	printf("\nbuf supply:\n");
 	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
 		printf(" %f ", buffer_supply[i]);
@@ -180,7 +205,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		printf(" %f ", buffer_demand[i]);
 	}
 	printf("\n");
-*/
+
 
 
 	printf("total supply mass post-calc: %d\n", sum_supply);
@@ -267,7 +292,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 		for(int i=0; i<v0->n; i++){
 			double val = 0.0;
 			for(int j=0; j<v0->n; j++){
-				val += gibbsVal(supply, demand, j, i, reg)*u0->data[j];
+				val += gibbsVal(supply, demand, j, i, reg)*u0->data[i];
 			}
 			if(val > 1e-7){
 				v0->data[i] = demandVector->data[i] / (val);

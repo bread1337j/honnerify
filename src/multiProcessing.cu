@@ -78,13 +78,17 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 		//double val = __expf(-1 * cost / reg) * v[j] * u[i] * mult;
 		double val = exp(-1 * cost / reg) * v[j] * u[i];
 		//atomicAdd(sum, val);
+		if(val > 1e-4){
+			printf(" %d %d %f \n", i, j, val);
+		}
 		for(int k=0; k<bytesPerPixel; k++){
 			double transport = ((double)supply[i*bytesPerPixel + k]) * (val / supplyVector[i]);
 			transport = fmin(transport, (double)supply[i * bytesPerPixel + k]);
 			transport = fmin(transport, 255.0 - ptr1[k]);
 
 			
-			atomicAdd(ptr1+k, transport); 
+			//atomicAdd(ptr1+k, transport); 
+			ptr1[k] += transport;
 			atomicAdd(supplySubtractor9000+(i*3+k), transport);
 		}
 	}
