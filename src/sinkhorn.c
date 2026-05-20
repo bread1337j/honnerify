@@ -102,24 +102,7 @@ double gibbsVal(const struct image* img0, const struct image* img1, u32 i, u32 j
 }
 
 
-
-
-#define EPSILON 1e-10
-
-struct image* createImageCPU(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector){
-	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
-	double* buffer_demand = (double*)calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
-	double* buffer_supply = (double*)malloc(output->bytesPerPixel * sizeof(double) * output->width * output->height);
-	
-	
-	u32 sum_supply = 0;
-	for(int i=0; i<output->width * output->height; i++){
-		for(int j=0; j<output->bytesPerPixel; j++){
-			buffer_supply[i*output->bytesPerPixel+j] = *((u8*)output->data+i*output->bytesPerPixel+j);
-			sum_supply += buffer_supply[i*output->bytesPerPixel+j];
-		}
-	}
-	printf("Total supply mass pre-transform: %d\n", sum_supply);
+void printMatrixInfo(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg){
 	printf("u:\n");
 	printVector(u0);
 	printf("v:\n");
@@ -140,13 +123,45 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		}
 		printf("\n");
 	}
-	double rowSum = 0; double colSum = 0;
+	double* rowSums = calloc(sizeof(double) , u0->n);
+	double* colSums = calloc(sizeof(double) , u0->n);
+
+	for(int j=0; j<u0->n; j++){
+		for(int i=0; i<u0->n; i++){
+			rowSums[j] += gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];
+			colSums[j] += gibbsVal(supply, demand, j, i, reg)*u0->data[j]*v0->data[i];
+		}
+		
+	}
+	printf("Sums:\nRows:\n");
 	for(int i=0; i<u0->n; i++){
-		rowSum += gibbsVal(supply, demand, i, 0, reg)*u0->data[i]*v0->data[0];
-		colSum += gibbsVal(supply, demand, 0, i, reg)*u0->data[0]*v0->data[i];
+		printf(" %f ", rowSums[i]);
+	}
+	printf("\nColumns:\n");
+	for(int i=0; i<u0->n; i++){
+		printf(" %f ", colSums[i]);
 	}
 
-	printf("Sums: %f %f\n", rowSum, colSum);
+	printf("\n");
+}
+
+#define EPSILON 1e-10
+
+struct image* createImageCPU(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector){
+	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
+	double* buffer_demand = (double*)calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
+	double* buffer_supply = (double*)malloc(output->bytesPerPixel * sizeof(double) * output->width * output->height);
+	u32 sum_supply = 0;
+	for(int i=0; i<output->width * output->height; i++){
+		for(int j=0; j<output->bytesPerPixel; j++){
+			buffer_supply[i*output->bytesPerPixel+j] = *((u8*)output->data+i*output->bytesPerPixel+j);
+			sum_supply += buffer_supply[i*output->bytesPerPixel+j];
+		}
+	}
+	printf("Total supply mass pre-transform: %d\n", sum_supply);
+	
+	printMatrixInfo(supply, demand, u0, v0, reg);
+	
 
 
 /*
@@ -289,15 +304,19 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 	
 
 	while(error > precision && c > 0 && iter < maxIter){ 
+		printf("\n\n");
 		for(int i=0; i<v0->n; i++){
 			double val = 0.0;
 			for(int j=0; j<v0->n; j++){
-				val += gibbsVal(supply, demand, j, i, reg)*u0->data[i];
+				val += gibbsVal(supply, demand, j, i, reg)*u0->data[j];
 			}
 			if(val > 1e-7){
-				v0->data[i] = demandVector->data[i] / (val);
+				//v0->data[i] = demandVector->data[i] / (val);
+				v0->data[i] = 1.0 / (val);
 			}
 		}
+		printf("\nRows scaled\n");
+		printMatrixInfo(supply, demand, u0, v0, reg);
 		pError = error;
 		error = 0.0;
 
@@ -308,12 +327,15 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 			}
 			double temp = u0->data[i];
 			if(val > 1e-7){
-				u0->data[i] = supplyVector->data[i] / (val);
+				//u0->data[i] = supplyVector->data[i] / (val);
+				u0->data[i] = 1.0 / (val);
 			}
 
 			double diff = temp - u0->data[i];
 			error += (diff > 0) ? diff : -diff; 
 		}
+		printf("\n\nColumns scaled\n");
+		printMatrixInfo(supply, demand, u0, v0, reg);
 		
 		dError = error-pError;
 		if(fabs(dError) < 1e-5){
