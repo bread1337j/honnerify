@@ -24,11 +24,11 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
 			cost *= (width);
 			//val += __expf(-1 * cost / reg) * u[j];
-			val += exp(-1 * cost / reg) * u[j];
+			val += __expf(-1 * cost / reg) * u[j];
 		}
 		if(val > 1e-7){
-			//v[i] = b[i] / val;
-			v[i] = 1.0 / val;
+			v[i] = b[i] / val; 
+			//v[i] = 1.0 / val;  
 		}
 	}
 }
@@ -51,11 +51,11 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 		
 			cost *= (width);
 			//val += __expf(-1 * cost / reg) * v[j];
-			val += exp(-1 * cost / reg) * v[j];
+			val += __expf(-1 * cost / reg) * v[j];
 		}
 		if(val > 1e-7){
-			//u[i] = a[i] / val;
-			u[i] = 1.0 / val;
+			u[i] = a[i] / val;
+			//u[i] = 1.0 / val;
 		}
 	}
 
@@ -78,11 +78,12 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 		double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 		cost *= width;
 		//double val = __expf(-1 * cost / reg) * v[j] * u[i] * mult;
-		double val = exp(-1 * cost / reg) * v[j] * u[i];
+		double val = __expf(-1 * cost / reg) * v[j] * u[i];
 		//atomicAdd(sum, val);
 		/*if(val > 1e-4){
 			printf(" %d %d %f \n", i, j, val);
 		}*/
+
 		for(int k=0; k<bytesPerPixel; k++){
 			double transport = ((double)supply[i*bytesPerPixel + k]) * (val / supplyVector[i]);
 			transport = fmin(transport, (double)supply[i * bytesPerPixel + k]);
@@ -90,7 +91,7 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 
 			
 			//atomicAdd(ptr1+k, transport); 
-			ptr1[k] += transport;
+			atomicAdd(ptr1+k , transport);
 			atomicAdd(supplySubtractor9000+(i*3+k), transport);
 		}
 	}
@@ -125,7 +126,7 @@ __global__ void nothing(){
 	return;
 }
 
-extern "C" void callSinkhornStep1(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
+extern "C" void callSinkhorn(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
 	
@@ -139,23 +140,10 @@ extern "C" void callSinkhornStep1(double* u, double* v, double* a, double* b, u3
 	
 	sinkhornStep1<<<numBlocks,blockSize>>>(u, v, a, b, len, width, height, reg);
     cudaDeviceSynchronize();
-}
-
-extern "C" void callSinkhornStep2(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
-	int blockSize = 256;
-	int numBlocks = (len + blockSize-1) / blockSize;
-	/*
-	int device = -1;
-	cudaGetDevice(&device);
-	struct cudaMemLocation sus = { .type = cudaMemLocationTypeDevice, .id = device};
-	cudaMemPrefetchAsync(u, len*sizeof(double), sus, device, 0);
-	cudaMemPrefetchAsync(v, len*sizeof(double), sus, device, 0);
-	cudaMemPrefetchAsync(a, len*sizeof(double), sus, device, 0);
-	cudaMemPrefetchAsync(b, len*sizeof(double), sus, device, 0);
-	*/
 	sinkhornStep2<<<numBlocks,blockSize>>>(u, v, a, b, len, width, height, reg);
     cudaDeviceSynchronize();
 }
+
 
 
 
@@ -167,7 +155,7 @@ extern "C" void cu_createArr(void** ptr, u32 len){
 	}
 }
 
-extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* supplyVector){ //this shit....is so ass...
+extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* supplyVector){ //this poop....is so ass...
     cudaDeviceSynchronize();
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;

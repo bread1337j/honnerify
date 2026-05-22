@@ -47,12 +47,12 @@ struct vectorN* imgToStochVec(struct image* img, double* buffer){
 	double sum = 0; 
 	u8* ptr = (u8*)img->data;
 	for(int i=0; i<out->n; i++){
-		out->data[i] = (1+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)));
+		out->data[i] = (0+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)));
 		//out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) * (*(ptr+i*3+1)) * (*(ptr+i*3+1)) * (*(ptr+i*3+2)) * (*(ptr+i*3+2)); 
 		//out->data[i] = 1.0 / out->n;
 		sum += out->data[i];
 	}
-	
+	printf("Created vector of sum %f, it will be normalized to 1.\n", sum);
 	for(int i=0; i<out->n; i++){
 		out->data[i] = out->data[i] / sum;
 	}
@@ -160,7 +160,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 	}
 	printf("Total supply mass pre-transform: %d\n", sum_supply);
 	
-	printMatrixInfo(supply, demand, u0, v0, reg);
+	//printMatrixInfo(supply, demand, u0, v0, reg);
 	
 
 
@@ -211,7 +211,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		}
 	}
 	
-	printf("\nbuf supply:\n");
+	/*printf("\nbuf supply:\n");
 	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
 		printf(" %f ", buffer_supply[i]);
 	}
@@ -219,7 +219,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
 		printf(" %f ", buffer_demand[i]);
 	}
-	printf("\n");
+	printf("\n");*/
 
 
 
@@ -311,12 +311,12 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 				val += gibbsVal(supply, demand, j, i, reg)*u0->data[j];
 			}
 			if(val > 1e-7){
-				//v0->data[i] = demandVector->data[i] / (val);
-				v0->data[i] = 1.0 / (val);
+				v0->data[i] = demandVector->data[i] / (val);
+				//v0->data[i] = 1.0 / (val);
 			}
 		}
-		printf("\nRows scaled\n");
-		printMatrixInfo(supply, demand, u0, v0, reg);
+		//printf("\nRows scaled\n");
+		//printMatrixInfo(supply, demand, u0, v0, reg);
 		pError = error;
 		error = 0.0;
 
@@ -327,15 +327,15 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 			}
 			double temp = u0->data[i];
 			if(val > 1e-7){
-				//u0->data[i] = supplyVector->data[i] / (val);
-				u0->data[i] = 1.0 / (val);
+				u0->data[i] = supplyVector->data[i] / (val);
+				//u0->data[i] = 1.0 / (val);
 			}
 
 			double diff = temp - u0->data[i];
 			error += (diff > 0) ? diff : -diff; 
 		}
-		printf("\n\nColumns scaled\n");
-		printMatrixInfo(supply, demand, u0, v0, reg);
+		//printf("\n\nColumns scaled\n");
+		//printMatrixInfo(supply, demand, u0, v0, reg);
 		
 		dError = error-pError;
 		if(fabs(dError) < 1e-5){
@@ -355,6 +355,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 				free(supplyVector);
 				supply = prog; 
 				supplyVector = imgToStochVec(supply, NULL);
+				//demandVector = imgToStochVec(demand, NULL);
 			}
 		}
 		iter++;
@@ -411,13 +412,12 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 		sum_supply+=*(((u8*)supply->data+i));
 		sum_demand+=(u8)pixelVal;
 	}
+	*/
 	printf("\n");
 	printf("total supply mass: %f\n", sum_supply); //everything breaks without this print statement. I don't know why.,, 
 	printf("total output mass post-calc: %f\n", sum_demand);
 	
-	descaler = (double)sum_supply / sum_demand;
-	printf("Descaler=%f\n", descaler);
-	*/
+	
 	u32 sum_output = 0;
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
@@ -465,8 +465,7 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 	char* str = (char*)malloc(50);
 	
 	while(iter < maxIter){ 
-		callSinkhornStep1(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
-		callSinkhornStep2(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
+		callSinkhorn(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
 		printf("Iteration %d\n", iter);
 		iter++;
 		if(flags & (MAKE_GIF_FLAG | RECURSIVE_IMAGE_FLAG)){
@@ -481,7 +480,8 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 				//free(supplyVector->data);
 				//free(supplyVector);
 				supply = prog; 
-				supplyVector = imgToStochVec(supply, buf1);
+				supplyVector = imgToStochVec(supply, buf1); //infinite mass duping is so back...
+				//demandVector = imgToStochVec(demand, buf2);
 			}
 		}
 	}
