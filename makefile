@@ -11,8 +11,8 @@ INCLUDES = -I$(INCLUDE)
 CFLAGS = $(INCLUDES) -MMD -MP -lm 
 CC = nvcc
 #Total hip obliteration.
-#ARGS = -t SmallTarget.png -s SmallSrc.png
-ARGS = -t ReallySmall1.png -s ReallySmall2.png -c $(ARG)
+ARGS = -t SmallTarget.png -s SmallSrc.png -c -g
+#ARGS = -t ReallySmall1.png -s ReallySmall2.png -c -g $(ARG)
 
 
 

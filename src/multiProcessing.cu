@@ -127,9 +127,11 @@ __global__ void nothing(){
 }
 
 extern "C" void callSinkhorn(double* u, double* v, double* a, double* b, u32 len, u32 width, u32 height, double reg){
-	int blockSize = 256;
-	int numBlocks = (len + blockSize-1) / blockSize;
-	
+	int blockSize;
+	int minGridSize;
+	int gridSize;
+	cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, sinkhornStep1, 0, 0);
+	gridSize = (len + blockSize -1) / blockSize;
 	int device = -1;
 	cudaGetDevice(&device);
 	struct cudaMemLocation sus = { .type = cudaMemLocationTypeDevice, .id = device};
@@ -138,9 +140,9 @@ extern "C" void callSinkhorn(double* u, double* v, double* a, double* b, u32 len
 	cudaMemPrefetchAsync(a, len*sizeof(double), sus, device, 0);
 	cudaMemPrefetchAsync(b, len*sizeof(double), sus, device, 0);
 	
-	sinkhornStep1<<<numBlocks,blockSize>>>(u, v, a, b, len, width, height, reg);
+	sinkhornStep1<<<gridSize,blockSize>>>(u, v, a, b, len, width, height, reg);
     cudaDeviceSynchronize();
-	sinkhornStep2<<<numBlocks,blockSize>>>(u, v, a, b, len, width, height, reg);
+	sinkhornStep2<<<gridSize,blockSize>>>(u, v, a, b, len, width, height, reg);
     cudaDeviceSynchronize();
 }
 
@@ -155,10 +157,15 @@ extern "C" void cu_createArr(void** ptr, u32 len){
 	}
 }
 
-extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* supplyVector){ //this poop....is so ass...
+extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* supplyVector){ 
     cudaDeviceSynchronize();
-	int blockSize = 256;
-	int numBlocks = (len + blockSize-1) / blockSize;
+	//int blockSize = 256;
+	//int numBlocks = (len + blockSize-1) / blockSize;
+	int blockSize;
+	int minGridSize;
+	int gridSize;
+	cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, naiveImageCreation, 0, 0);
+	gridSize = (len + blockSize -1) / blockSize;
 	
 	
 	int device = -1;
@@ -170,7 +177,7 @@ extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b
 	cudaMemPrefetchAsync(b, len*sizeof(double), sus, device, 0);
 	
 
-	zeroOneCopyAnother<<<numBlocks, blockSize>>>(b, a, supply, bytesPerPixel, len);
+	zeroOneCopyAnother<<<gridSize, blockSize>>>(b, a, supply, bytesPerPixel, len);
     cudaDeviceSynchronize();
 	
 	/*for(int i=0; i<len*bytesPerPixel; i++){
@@ -193,10 +200,10 @@ extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b
 	}
 	//cudaMemcpy(sVec, supplyVector, width*bytesPerPixel*sizeof(double), cudaMemcpyHostToDevice);
 
-	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, supplySubtractor9000, reg, mult, len, width, bytesPerPixel, sum, sVec);
+	naiveImageCreation<<<gridSize,blockSize>>>(u, v, a, b, supply, supplySubtractor9000, reg, mult, len, width, bytesPerPixel, sum, sVec);
     cudaDeviceSynchronize();
 
-	subtractSupply<<<numBlocks, blockSize>>>(a, supplySubtractor9000, len, bytesPerPixel);
+	subtractSupply<<<gridSize, blockSize>>>(a, supplySubtractor9000, len, bytesPerPixel);
     cudaDeviceSynchronize();
 
 
