@@ -384,9 +384,8 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	cu_createArr((void**)&buffer_demand, output->bytesPerPixel * sizeof(double) * output->width * output->height);
 	cu_createArr((void**)&buffer_supply, output->bytesPerPixel * sizeof(double) * output->width * output->height);
 	
-	double mult = 1;//supplyVector->n*1.0;
 
-	cu_naiveImageCreation(u0->data, v0->data, buffer_supply, buffer_demand, supply->data, demand->data, reg, mult, u0->n, supply->width, supply->bytesPerPixel, supplyVector->data);
+	cu_naiveImageCreation(u0->data, v0->data, buffer_supply, buffer_demand, supply->data, demand->data, reg, u0->n, supply->width, supply->bytesPerPixel, supplyVector->data);
 	double sum_supply = 0;
 	double sum_demand = 0;
 	u32 total_mass = 0;
@@ -420,7 +419,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	
 	u32 sum_output = 0;
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
-		double pixelVal=ceil(buffer_demand[i]+buffer_supply[i]);
+		double pixelVal=round(buffer_demand[i]+buffer_supply[i]);
 		//pixelVal *= descaler;
 		if(pixelVal > 255){
 			pixelVal = 255;

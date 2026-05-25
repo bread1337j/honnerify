@@ -13,7 +13,7 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 	for(int i=index; i<len; i+=stride){
 		double val = 0.0;
 		double p0_x = (double)(i % width) / (double)width;
-		double p0_y = (double)(i / width) / (double)width;
+		double p0_y = (double)(i / width) / (double)width; //this is why we cant put the cost into a function btw
 		for(int j=0; j<len; j++){
 			
 			double p1_x = (double)(j % width) / (double)width;
@@ -21,14 +21,12 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 			//probably less efficient this way but like. I want to be able to read my code man.
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 			
-			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
 			cost *= (width);
-			//val += __expf(-1 * cost / reg) * u[j];
 			val += __expf(-1 * cost / reg) * u[j];
 		}
 		if(val > 1e-7){
 			v[i] = b[i] / val; 
-			//v[i] = 1.0 / val;  
+			//v[i] = 1.0 / val; //evil graph maker 9000
 		}
 	}
 }
@@ -46,16 +44,13 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 			double p1_y = (double)(j / width) / (double)width;
 
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
-			
-			//double cost = ((i%width)/width - (j%width)/width) * ((i%width)/width - (j%width)/width) + ((i/width)/width - (j/width)/width) * ((i/width)/width - (j/width)/width);
 		
 			cost *= (width);
-			//val += __expf(-1 * cost / reg) * v[j];
 			val += __expf(-1 * cost / reg) * v[j];
 		}
 		if(val > 1e-7){
 			u[i] = a[i] / val;
-			//u[i] = 1.0 / val;
+			//u[i] = 1.0 / val; //doubly stochastic demon
 		}
 	}
 
@@ -63,7 +58,7 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 
 
 
-__global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, double* supplySubtractor9000, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* sum, double* supplyVector){
+__global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, double* supplySubtractor9000, double reg, u32 len, u32 width, u8 bytesPerPixel, double* sum, double* supplyVector){
 	//pretty much step 3 tbh
 	int j = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -77,12 +72,7 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 
 		double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
 		cost *= width;
-		//double val = __expf(-1 * cost / reg) * v[j] * u[i] * mult;
 		double val = __expf(-1 * cost / reg) * v[j] * u[i];
-		//atomicAdd(sum, val);
-		/*if(val > 1e-4){
-			printf(" %d %d %f \n", i, j, val);
-		}*/
 
 		for(int k=0; k<bytesPerPixel; k++){
 			double transport = ((double)supply[i*bytesPerPixel + k]) * (val / supplyVector[i]);
@@ -90,12 +80,10 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 			transport = fmin(transport, 255.0 - ptr1[k]);
 
 			
-			//atomicAdd(ptr1+k, transport); 
 			atomicAdd(ptr1+k , transport);
 			atomicAdd(supplySubtractor9000+(i*3+k), transport);
 		}
 	}
-	//printf("\n");
 }
 
 __global__ void subtractSupply(double* supply, double* supplySubtractor9000, u32 len, u8 bytesPerPixel){
@@ -156,7 +144,7 @@ extern "C" void cu_createArr(void** ptr, u32 len){
 	}
 }
 
-extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, double mult, u32 len, u32 width, u8 bytesPerPixel, double* supplyVector){ 
+extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b, u8* supply, u8* demand, double reg, u32 len, u32 width, u8 bytesPerPixel, double* supplyVector){ 
     cudaDeviceSynchronize();
 	int blockSize = 256;
 	int numBlocks = (len + blockSize-1) / blockSize;
@@ -194,7 +182,7 @@ extern "C" void cu_naiveImageCreation(double* u, double* v, double* a, double* b
 	}
 	//cudaMemcpy(sVec, supplyVector, width*bytesPerPixel*sizeof(double), cudaMemcpyHostToDevice);
 
-	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, supplySubtractor9000, reg, mult, len, width, bytesPerPixel, sum, sVec);
+	naiveImageCreation<<<numBlocks,blockSize>>>(u, v, a, b, supply, supplySubtractor9000, reg, len, width, bytesPerPixel, sum, sVec);
     cudaDeviceSynchronize();
 
 	subtractSupply<<<numBlocks, blockSize>>>(a, supplySubtractor9000, len, bytesPerPixel);
