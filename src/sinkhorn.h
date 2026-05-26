@@ -26,6 +26,7 @@ struct vectorN {
 #define MAKE_GIF_FLAG (1<<0)
 #define CUDA_BACKEND_FLAG (1<<1)
 #define RECURSIVE_IMAGE_FLAG (1<<2)
+#define PRINT_TRANSPORT_PLAN (1<<3)
 
 
 struct image* sinkhorn(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 flags);

@@ -9,6 +9,7 @@
 #define MAKE_GIF_FLAG (1<<0)
 #define CUDA_BACKEND_FLAG (1<<1)
 #define RECURSIVE_IMAGE_FLAG (1<<2)
+#define PRINT_TRANSPORT_PLAN (1<<3)
 
 struct matrix {
 	u32 width;
@@ -47,9 +48,12 @@ struct vectorN* imgToStochVec(struct image* img, double* buffer){
 	double sum = 0; 
 	u8* ptr = (u8*)img->data;
 	for(int i=0; i<out->n; i++){
-		out->data[i] = (0+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)));
-		//out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) * (*(ptr+i*3+1)) * (*(ptr+i*3+1)) * (*(ptr+i*3+2)) * (*(ptr+i*3+2)); 
+		//out->data[i] = (0+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)));
+		out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) + (*(ptr+i*3+1)) * (*(ptr+i*3+1)) + (*(ptr+i*3+2)) * (*(ptr+i*3+2)); 
 		//out->data[i] = 1.0 / out->n;
+		/*if(out->data[i] == 0){
+			out->data[i] = 1;
+		}*/
 		sum += out->data[i];
 	}
 	printf("Created vector of sum %f, it will be normalized to 1.\n", sum);
@@ -147,18 +151,18 @@ void printMatrixInfo(struct image* supply, struct image* demand, struct vectorN*
 
 #define EPSILON 1e-10
 
-struct image* createImageCPU(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector){
+struct image* createImageCPU(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector, u8 flags){
 	struct image* output = resizeImage(supply, supply);//malloc(sizeof(struct image));
 	double* buffer_demand = (double*)calloc(output->bytesPerPixel * sizeof(double), output->width * output->height);
 	double* buffer_supply = (double*)malloc(output->bytesPerPixel * sizeof(double) * output->width * output->height);
-	u32 sum_supply = 0;
+	double sum_supply = 0;
 	for(int i=0; i<output->width * output->height; i++){
 		for(int j=0; j<output->bytesPerPixel; j++){
 			buffer_supply[i*output->bytesPerPixel+j] = *((u8*)output->data+i*output->bytesPerPixel+j);
 			sum_supply += buffer_supply[i*output->bytesPerPixel+j];
 		}
 	}
-	printf("Total supply mass pre-transform: %d\n", sum_supply);
+	printf("Total supply mass pre-transform: %f\n", sum_supply);
 	
 	//printMatrixInfo(supply, demand, u0, v0, reg);
 	
@@ -203,7 +207,7 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		//printf("\n%f\n", rowSum);
 	}
 	sum_supply = 0;
-	u32 sum_demand = 0;
+	double sum_demand = 0;
 	for(int i=0; i<output->width * output->height; i++){
 		for(int j=0; j<output->bytesPerPixel; j++){
 			sum_supply += buffer_supply[i*output->bytesPerPixel+j];
@@ -223,9 +227,9 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 
 
 
-	printf("total supply mass post-calc: %d\n", sum_supply);
-	printf("total demand mass post-calc: %d\n", sum_demand);
-	printf("Total mass post-calc: %d\n", sum_supply+sum_demand);
+	printf("total supply mass post-calc: %f\n", sum_supply);
+	printf("total demand mass post-calc: %f\n", sum_demand);
+	printf("Total mass post-calc: %f\n", sum_supply+sum_demand);
 	sum_supply = 0;
 	sum_demand = 0;
 	u32 total_mass = 0;
@@ -244,8 +248,9 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 		sum_demand+=(u8)pixelVal;
 	}
 	//printf("\n");
-	descaler = (double)sum_supply / sum_demand;
-	printf("descaling constant: %d/%d=%f\n", sum_supply, sum_demand, descaler);
+	descaler = sum_demand / sum_supply;
+	//descaler = 1;
+	printf("descaling constant: %f/%f=%f\n", sum_supply, sum_demand, descaler);
 	sum_supply = 0;
 	sum_demand = 0;
 	//printf("Out: \n");
@@ -343,7 +348,7 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 		}
 
 		if(flags & (MAKE_GIF_FLAG | RECURSIVE_IMAGE_FLAG)){
-			struct image* prog = createImageCPU(supply, demand, u0, v0, reg, supplyVector);
+			struct image* prog = createImageCPU(supply, demand, u0, v0, reg, supplyVector, flags);
 			if(flags & MAKE_GIF_FLAG){
 				sprintf(str, "output/gif/%04d.png", iter);
 				writeImage(prog, str);
@@ -368,10 +373,10 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 	//printVector(u0);
 	//printVector(v0);
 
-	return createImageCPU(supply, demand, u0, v0, reg, supplyVector);
+	return createImageCPU(supply, demand, u0, v0, reg, supplyVector, flags);
 }
 
-struct image* createImage(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector){
+struct image* createImage(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector, u8 flags){
 	struct image* output = malloc(sizeof(struct image));
 	output->width = supply->width; 
 	output->height = supply->height; 
@@ -389,6 +394,7 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	double sum_supply = 0;
 	double sum_demand = 0;
 	u32 total_mass = 0;
+
 	/*
 	printf("\nbuf supply:\n");
 	for(int i=0; i<output->width * output->height * output->bytesPerPixel; i++){
@@ -417,6 +423,22 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	printf("total output mass post-calc: %f\n", sum_demand);
 	
 	
+	if(flags & PRINT_TRANSPORT_PLAN){
+		for(int i=0; i<u0->n; i++){
+			if(supplyVector->data[i] > 0){
+				for(int j=0; j<v0->n; j++){
+					double val = gibbsVal(supply, demand, i, j, reg)*u0->data[i]*v0->data[j];// supplyVector->data[i];
+					if(val > 0){
+						printf(" %f ", val);
+					}else{
+						printf(" ");
+					}
+				}
+			} 
+			printf("\n");
+		}
+	}
+
 	u32 sum_output = 0;
 	for(int i=0; i<output->bytesPerPixel * output->width * output->height; i++){
 		double pixelVal=round(buffer_demand[i]+buffer_supply[i]);
@@ -468,7 +490,7 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 		printf("Iteration %d\n", iter);
 		iter++;
 		if(flags & (MAKE_GIF_FLAG | RECURSIVE_IMAGE_FLAG)){
-			struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector);
+			struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector, flags);
 			if(flags & MAKE_GIF_FLAG){
 				sprintf(str, "output/gif/%04d.png", iter);
 				writeImage(prog, str);
@@ -486,7 +508,7 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 	}
 	//printVector(u0);
 	//printVector(v0);
-	return createImage(supply, demand, u0, v0, reg, supplyVector);
+	return createImage(supply, demand, u0, v0, reg, supplyVector, flags);
 	//return createImageCPU(supply, demand, u0, v0, reg, supplyVector);
 }
 
