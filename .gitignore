@@ -1,4 +1,8 @@
 .clangd
+*.png
+*.jpg
+*.jpeg
+*.bmp
 
 # Prerequisites
 *.d

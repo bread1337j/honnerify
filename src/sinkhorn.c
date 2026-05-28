@@ -24,7 +24,7 @@ struct vector2 {
 };
 
 struct vectorN {
-	u16 n;
+	u32 n;
 	double* data;
 };
 
@@ -463,6 +463,9 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 	u16 iter = 0;
 	char* str = (char*)malloc(50);
 	
+	if(flags & MAKE_GIF_FLAG){
+		writeImage(supply, "output/gif/0000.png");
+	}
 	while(iter < maxIter){ 
 		callSinkhorn(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
 		printf("Iteration %d\n", iter);

@@ -8,7 +8,7 @@ INCLUDE = include
 OUTPUT  = output
 
 INCLUDES = -I$(INCLUDE)
-CFLAGS   = $(INCLUDES) -MMD -MP -lm
+CFLAGS   = $(INCLUDES) -MMD -MP -lm -O3
 CC       = nvcc
 #Total hip obliteration.
 ARGS = -t SmallTarget.png -s SmallSrc.png -c -g -R

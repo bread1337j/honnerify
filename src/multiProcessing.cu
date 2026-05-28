@@ -19,7 +19,7 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 			double p1_x = (double)(j % width) / (double)width;
 			double p1_y = (double)(j / width) / (double)width;
 			//probably less efficient this way but like. I want to be able to read my code man.
-			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
+			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y) + 0;
 			
 			cost *= (width);
 			val += __expf(-1 * cost / reg) * u[j];
@@ -43,7 +43,7 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 			double p1_x = (double)(j % width) / (double)width;
 			double p1_y = (double)(j / width) / (double)width;
 
-			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
+			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y) + 0;
 		
 			cost *= (width);
 			val += __expf(-1 * cost / reg) * v[j];
@@ -70,7 +70,7 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 		double p0_x = (double) (i%width) / (double) width;
 		double p0_y = (double) (i/width) / (double) width;
 
-		double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y);
+		double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y) + 0;
 		cost *= width;
 		double val = __expf(-1 * cost / reg) * v[j] * u[i];
 
