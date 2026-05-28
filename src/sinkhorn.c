@@ -90,8 +90,8 @@ double vNDot(struct vectorN* v0, struct vectorN* v1){
 
 
 double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u32 j){
-    struct vector2 p0 = {(double)(i % img0->width) / img0->width, (double)(i / img0->width) / img0->width};
-    struct vector2 p1 = {(double)(j % img1->width) / img1->width, (double)(j / img1->width) / img1->width};
+    struct vector2 p0 = {(double)(i % img0->width) , (double)(i / img0->width) };
+    struct vector2 p1 = {(double)(j % img1->width) , (double)(j / img1->width) };
 
 	double dPos = (p0.x-p1.x)*(p0.x-p1.x) + (p0.y-p1.y)*(p0.y-p1.y);
 
@@ -424,6 +424,8 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	
 	
 	if(flags & PRINT_TRANSPORT_PLAN){
+		printVector(u0);
+		printVector(v0);
 		for(int i=0; i<u0->n; i++){
 			if(supplyVector->data[i] > 0){
 				for(int j=0; j<v0->n; j++){

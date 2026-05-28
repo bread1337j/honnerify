@@ -12,16 +12,16 @@ __global__ void sinkhornStep1(double* u, double* v, double* a, double* b, u32 le
 	int stride = blockDim.x * gridDim.x;
 	for(int i=index; i<len; i+=stride){
 		double val = 0.0;
-		double p0_x = (double)(i % width) / (double)width;
-		double p0_y = (double)(i / width) / (double)width; //this is why we cant put the cost into a function btw
+		double p0_x = (double)(i % width);// / (double)width;
+		double p0_y = (double)(i / width);// / (double)width; //this is why we cant put the cost into a function btw
 		for(int j=0; j<len; j++){
 			
-			double p1_x = (double)(j % width) / (double)width;
-			double p1_y = (double)(j / width) / (double)width;
+			double p1_x = (double)(j % width);// / (double)width;
+			double p1_y = (double)(j / width);// / (double)width;
 			//probably less efficient this way but like. I want to be able to read my code man.
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y) + 0;
 			
-			cost *= (width);
+			//cost *= (width);
 			val += __expf(-1 * cost / reg) * u[j];
 		}
 		if(val > 1e-7){
@@ -36,16 +36,16 @@ __global__ void sinkhornStep2(double* u, double* v, double* a, double* b, u32 le
 	int stride = blockDim.x * gridDim.x;
 	for(int i=index; i<len; i+=stride){
 		double val = 0.0;
-		double p0_x = (double)(i % width) / (double)width;
-		double p0_y = (double)(i / width) / (double)width;
+		double p0_x = (double)(i % width);// / (double)width;
+		double p0_y = (double)(i / width);// / (double)width;
 		for(int j=0; j<len; j++){ //since the cost is just distance, it should be symmetric, thus C^T=C
 			
-			double p1_x = (double)(j % width) / (double)width;
-			double p1_y = (double)(j / width) / (double)width;
+			double p1_x = (double)(j % width);// / (double)width;
+			double p1_y = (double)(j / width);// / (double)width;
 
 			double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y) + 0;
 		
-			cost *= (width);
+			//cost *= (width);
 			val += __expf(-1 * cost / reg) * v[j];
 		}
 		if(val > 1e-7){
@@ -62,22 +62,22 @@ __global__ void naiveImageCreation(double* u, double* v, double* a, double* b, u
 	//pretty much step 3 tbh
 	int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-	double p1_x = (double) (j%width) / (double) width;
-	double p1_y = (double) (j/width) / (double) width;
+	double p1_x = (double) (j%width);// / (double) width;
+	double p1_y = (double) (j/width);// / (double) width;
 	double* ptr1 = b + (j * bytesPerPixel);
 
 	for(int i=0; i<len; i++){
-		double p0_x = (double) (i%width) / (double) width;
-		double p0_y = (double) (i/width) / (double) width;
+		double p0_x = (double) (i%width);// / (double) width;
+		double p0_y = (double) (i/width);// / (double) width;
 
 		double cost = (p0_x - p1_x)*(p0_x - p1_x) + (p0_y - p1_y)*(p0_y - p1_y) + 0;
-		cost *= width;
+		//cost *= width;
 		double val = __expf(-1 * cost / reg) * v[j] * u[i];
 
 		for(int k=0; k<bytesPerPixel; k++){
 			double transport = ((double)supply[i*bytesPerPixel + k]) * (val / supplyVector[i]);
 			transport = fmin(transport, (double)supply[i * bytesPerPixel + k]);
-			transport = fmin(transport, 255.0 - ptr1[k]);
+			//transport = fmin(transport, 255.0 - ptr1[k]);
 
 			
 			atomicAdd(ptr1+k , transport);
