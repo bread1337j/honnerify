@@ -26,7 +26,7 @@ struct vectorN* imgToStochVec(struct image* img, double* buffer){
 	double sum = 0; 
 	u8* ptr = (u8*)img->data;
 	for(int i=0; i<out->n; i++){
-		out->data[i] = (0+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2))); // THE ACTUAL LUMINANCE
+		out->data[i] = (1+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2))); // THE ACTUAL LUMINANCE
 		// out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) + (*(ptr+i*3+1)) * (*(ptr+i*3+1)) + (*(ptr+i*3+2)) * (*(ptr+i*3+2)); // nOT THIIS ONE
 		//out->data[i] = 1.0 / out->n;
 		/*if(out->data[i] == 0){
@@ -280,14 +280,14 @@ struct image* discreteCreateImage(struct image* supply, struct image* demand, st
 	struct vectorN* reglna = malloc(sizeof(struct vectorN)); 
 	reglna->data = malloc(sizeof(double) * demandVector->n);
 	for (int demandPix = 0; demandPix < totalPixels; demandPix++) {
-		double demandScaler = u0->data[demandPix];
+		double demandScaler = v0->data[demandPix];
 		reglna->data[demandPix] = reg * log(demandScaler);
 	}
 
 	struct vectorN* reglnb = malloc(sizeof(struct vectorN));
 	reglnb->data = malloc(sizeof(double) * supplyVector->n);
 	for (int supplyPix = 0; supplyPix < totalPixels; supplyPix++) {
-		double supplyScaler = v0->data[supplyPix];
+		double supplyScaler = u0->data[supplyPix];
 		reglnb->data[supplyPix] = reg * log(supplyScaler);
 	}
 
@@ -669,7 +669,12 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 		printf("Iteration %d\n", iter);
 		iter++;
 		if(flags & (MAKE_GIF_FLAG | RECURSIVE_IMAGE_FLAG)){
-			struct image* prog = createImage(supply, demand, u0, v0, reg, supplyVector, flags);
+			struct image* prog;
+			if(flags & USE_GREEDY_ALGORITHM){
+				prog = discreteCreateImage(supply, demand, u0, v0, reg, supplyVector, demandVector, flags);
+			}else{
+				prog = createImage(supply, demand, u0, v0, reg, supplyVector, flags);
+			}
 			if(flags & MAKE_GIF_FLAG){
 				sprintf(str, "output/gif/%04d.png", iter);
 				writeImage(prog, str);
@@ -688,7 +693,7 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 	//printVector(u0);
 	//printVector(v0);
 	// return createImage(supply, demand, u0, v0, reg, supplyVector, flags);
-
+	printf("%d", flags & USE_GREEDY_ALGORITHM);
 	if(flags & USE_GREEDY_ALGORITHM) {
 		return discreteCreateImage(supply, demand, u0, v0, reg, supplyVector, demandVector, flags);
 	} else {
