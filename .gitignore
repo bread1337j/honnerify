@@ -3,6 +3,9 @@
 *.jpg
 *.jpeg
 *.bmp
+bin
+build
+output
 
 # Prerequisites
 *.d

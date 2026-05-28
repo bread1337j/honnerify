@@ -7,7 +7,7 @@
 #include "sinkhorn.h"
 
 #include <string.h>
-
+#include <unistd.h>
 
 
 int main(int argc, char** argv){
@@ -53,6 +53,8 @@ int main(int argc, char** argv){
 			flags |= CUDA_BACKEND_FLAG;
 		}else if(!strcmp(argv[i], "-R") || !strcmp(argv[i], "-Recursive")){
 			flags |= RECURSIVE_IMAGE_FLAG;
+		}else if(!strcmp(argv[i], "-v")){
+			flags |= PRINT_TRANSPORT_PLAN;
 		} else {
 			printf("Unknown argument %s\n", argv[i]);
 			exit(2);
@@ -70,7 +72,10 @@ int main(int argc, char** argv){
 
 
 	if(_target->bytesPerPixel != source->bytesPerPixel){
+		printf("\n!\n!");
 		printf("Bytes per pixel don't match, the output will be straight NONSENSE\n");
+		printf("\n!\n!");
+		sleep(1); 
 	}
 
 	struct image* target = resizeImage(_target, source);
