@@ -18,7 +18,7 @@ struct image {
 struct image* loadImage(char* path){
 	struct image* out = (struct image*) malloc(sizeof(struct image));
 	out->data=stbi_load(path, &out->width, &out->height, &out->bytesPerPixel, 3);
-	printf("Bytes per pixel: %d\n", out->bytesPerPixel);
+	// printf("Bytes per pixel: %d\n", out->bytesPerPixel);
 	return out;
 }
 

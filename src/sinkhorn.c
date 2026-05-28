@@ -1,3 +1,4 @@
+#include "sinkhorn.h"
 #include "image.h"
 #include <math.h>
 #include <stdlib.h>
@@ -5,29 +6,6 @@
 #include <string.h> 
 #include <unistd.h>
 #include "multiProcessing.h"
-
-#define MAKE_GIF_FLAG (1<<0)
-#define CUDA_BACKEND_FLAG (1<<1)
-#define RECURSIVE_IMAGE_FLAG (1<<2)
-#define PRINT_TRANSPORT_PLAN (1<<3)
-
-struct matrix {
-	u32 width;
-	u32 height;
-	void* data;
-};
-
-struct vector3 {
-	double x, y, z;
-};
-struct vector2 {
-	double x, y;
-};
-
-struct vectorN {
-	u16 n;
-	double* data;
-};
 
 void printVector(struct vectorN* vec){
 	printf("<");
@@ -48,8 +26,8 @@ struct vectorN* imgToStochVec(struct image* img, double* buffer){
 	double sum = 0; 
 	u8* ptr = (u8*)img->data;
 	for(int i=0; i<out->n; i++){
-		//out->data[i] = (0+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2)));
-		out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) + (*(ptr+i*3+1)) * (*(ptr+i*3+1)) + (*(ptr+i*3+2)) * (*(ptr+i*3+2)); 
+		out->data[i] = (0+0.299*(*(ptr+i*3))+0.587*(*(ptr+i*3+1))+0.114*(*(ptr+i*3+2))); // THE ACTUAL LUMINANCE
+		// out->data[i] = (*(ptr+i*3)) * (*(ptr+i*3)) + (*(ptr+i*3+1)) * (*(ptr+i*3+1)) + (*(ptr+i*3+2)) * (*(ptr+i*3+2)); // nOT THIIS ONE
 		//out->data[i] = 1.0 / out->n;
 		/*if(out->data[i] == 0){
 			out->data[i] = 1;
@@ -90,8 +68,8 @@ double vNDot(struct vectorN* v0, struct vectorN* v1){
 
 
 double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u32 j){
-    struct vector2 p0 = {(double)(i % img0->width) / img0->width, (double)(i / img0->width) / img0->width};
-    struct vector2 p1 = {(double)(j % img1->width) / img1->width, (double)(j / img1->width) / img1->width};
+    struct vector2 p0 = {(double)(i % img0->width), (double)(i / img0->width)}; // Why is this kid normalizing the x and y values
+    struct vector2 p1 = {(double)(j % img1->width), (double)(j / img1->width)};
 
 	double dPos = (p0.x-p1.x)*(p0.x-p1.x) + (p0.y-p1.y)*(p0.y-p1.y);
 
@@ -102,7 +80,10 @@ double imgCalcCost(const struct image* img0, const struct image* img1, u32 i, u3
 
 double gibbsVal(const struct image* img0, const struct image* img1, u32 i, u32 j, double reg){
 	//return imgCalcCost(img0, img1, i, j);
-	return exp(-1*imgCalcCost(img0, img1, i, j)/reg);
+	double cost = imgCalcCost(img0, img1, i, j);
+	double output = exp(-1*cost/reg);
+	// printf("Cost is %lf -> GibbsVal is %lf\n", cost, output);
+	return output;
 }
 
 
@@ -276,11 +257,193 @@ struct image* createImageCPU(struct image* supply, struct image* demand, struct 
 }
 
 
+#define MIN(i, j) (((i) < (j)) ? (i) : (j))
+#define MAX(i, j) (((i) > (j)) ? (i) : (j))
+struct image* discreteCreateImage(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector, struct vectorN* demandVector, u8 flags) {
+	// possibly make these user defined inputs....
+	int searchRadius = 25;
+	double thresholdDelta = 0.025;
 
 
+	int totalPixels = supply->width * supply->height;
+	int numUnassigned = totalPixels;
+	int* assignedDemandPixels = calloc(totalPixels, sizeof(int)); //demand obv
+	int* pixelsToAssign = malloc(sizeof(int) * totalPixels); //ie supply
+	for (int i = 0; i < totalPixels; i++) {
+		pixelsToAssign[i] = i;
+		// RANDOMIZE THIS SELECTION
+	}
+	struct vector2* assignments = calloc(totalPixels, sizeof(struct vector2));
+	// x=original position/supply   &&     y=new position/demand
+
+	//Total pixels should actually be total demand pixels but we're only ever using this for images
+	struct vectorN* reglna = malloc(sizeof(struct vectorN)); 
+	reglna->data = malloc(sizeof(double) * demandVector->n);
+	for (int demandPix = 0; demandPix < totalPixels; demandPix++) {
+		double demandScaler = u0->data[demandPix];
+		reglna->data[demandPix] = reg * log(demandScaler);
+	}
+
+	struct vectorN* reglnb = malloc(sizeof(struct vectorN));
+	reglnb->data = malloc(sizeof(double) * supplyVector->n);
+	for (int supplyPix = 0; supplyPix < totalPixels; supplyPix++) {
+		double supplyScaler = v0->data[supplyPix];
+		reglnb->data[supplyPix] = reg * log(supplyScaler);
+	}
+
+	int oneExtraPass = 0;
+	for (double threshold = 1; threshold > 0.0 || !oneExtraPass; threshold -= thresholdDelta) {
+		if (threshold <= 0.0) {
+			oneExtraPass = 1;
+			searchRadius = MAX(supply->width, supply->height);
+		}
+		int anyCandidates = 0;
+		for (int pixelIndex = 0; pixelIndex < numUnassigned; pixelIndex++) {
+			int supplyPixel = pixelsToAssign[pixelIndex];
+			double supplyVal = supplyVector->data[supplyPixel];
+			
+			int likeliestDemandPixel;
+			double likeliestDemandPixelScore;
+			int pixelFound = 0;
+
+			int xPos = supplyPixel % supply->width;
+			int yPos = supplyPixel / supply->width;
+			int xMin = MAX(xPos - searchRadius, 0);
+			int xMax = MIN(xPos + searchRadius, supply->width - 1);
+			int yMin = MAX(yPos - searchRadius, 0);
+			int yMax = MIN(yPos + searchRadius, supply->height - 1);
+
+			// Find target pixels in radius
+			for (int x = xMin; x <= xMax; x++) {
+				for (int y = yMin; y <= yMax; y++) {
+					int targetedDemandPixel = x + y * supply->width;
+					if (assignedDemandPixels[targetedDemandPixel]) continue;
+
+					double cost = (x - xPos) * (x - xPos) + (y - yPos) * (y - yPos);
+					double newestScore = reglna->data[targetedDemandPixel] + reglnb->data[supplyPixel] - cost;
+					// -C+reg*ln(a)+reg*ln(b) = reg * ln(P) ---- this has the same ordering of reg * ln(P) and therefore P as well (P being the gibbs val)
+
+					if (!pixelFound || newestScore > likeliestDemandPixelScore) {
+						likeliestDemandPixel = targetedDemandPixel;
+						likeliestDemandPixelScore = newestScore;
+						pixelFound = 1;
+						anyCandidates = 1;
+					}
+					// add case for none found
+				}
+			}
+
+			if (pixelFound == 0) {
+				continue;
+			} 
+			// determine actual gibbsVal of likeliest demandPixel
+			// if no pixels available, skip until confirmed no more possible assignments
+			double likelihood = u0->data[likeliestDemandPixel] * 
+								v0->data[supplyPixel] *
+								gibbsVal(supply, demand, supplyPixel, likeliestDemandPixel, reg) / supplyVal;
+			if (supplyVal == 0) printf("WARNING: division by supplyval=0!!!!!!!!!!!!!!!!!!!!\n");
+			if (likelihood > threshold) {
+				// Remove the two pixels from availability
+				pixelsToAssign[pixelIndex] = pixelsToAssign[numUnassigned - 1];
+				// pixelsToAssign[numUnassigned - 1] = -1;
+				assignedDemandPixels[likeliestDemandPixel] = 1;
+				pixelIndex--;
+
+				//assign
+				assignments[totalPixels - numUnassigned].x = supplyPixel;
+				assignments[totalPixels - numUnassigned].y = likeliestDemandPixel;
+				printf("%lf/%lf Assigned %d->%d\n", likelihood, threshold, supplyPixel, likeliestDemandPixel);
+
+				numUnassigned--;
+				// determines later if all pixels are mutually unassigned
+			} else {
+				// printf("%lf < %lf\n", likelihood, threshold);
+			}
+		}	
+
+		if (!anyCandidates) {
+			printf("WARNING: No assignments found!!!!!!!!!!!!!!! (should be impossible)\n");
+			break;
+		}
+	}
 
 
+	// int* lastDemandPixels = malloc(sizeof(int) * numUnassigned);
 
+	// int unassignedDemandPixelsFound = 0;
+	// for (int i = 0; unassignedDemandPixelsFound < numUnassigned; i++) {
+	// 	if (0 == assignedDemandPixels[i]) { // if demand pixel is not yet assigned then
+	// 		lastDemandPixels[unassignedDemandPixelsFound] = i;
+	// 		unassignedDemandPixelsFound++;
+	// 	}
+	// }
+
+	// for (int i = 0; i < numUnassigned; i++) {
+	// 	assignments[totalPixels - numUnassigned].x = pixelsToAssign[i];
+	// 	assignments[totalPixels - numUnassigned].y = lastDemandPixels[i];
+	// 	printf("Last resort %d->%d\n", assignments[totalPixels - numUnassigned].x, assignments[totalPixels - numUnassigned].y);
+	// }
+
+	// // int pixelIndex = numUnassigned - 1;
+	// // while (pixelIndex >= 0) { // just assigns the unassigned pixels to closest neighbor
+	// // 	int supplyPixel = pixelsToAssign[pixelIndex];
+	// // 	int sxPos = supplyPixel % supply->width;
+	// // 	int syPos = supplyPixel / supply->width;
+
+	// // 	int closestPixelIndex;
+	// // 	int closestDist = supply->width+supply->height; // guaranteed to be farther than the farthest remaining pixel
+
+	// // 	for (int demandIndex = 0; demandIndex < numUnassigned; demandIndex++) {
+	// // 		int demandPixel = lastDemandPixels[demandIndex];
+	// // 		int dxPos = demandPixel % supply->width;;
+	// // 		int dyPos = demandPixel % supply->width;
+
+	// // 		double sqdist = (sxPos - dxPos) * (sxPos - dxPos) + (syPos - dyPos) * (syPos - dyPos);
+
+	// // 		if (sqdist < closestDist) {
+	// // 			closestPixelIndex = demandIndex;
+	// // 			closestDist = sqdist;
+	// // 		}
+	// // 	}
+
+	// // 	//remove then assign
+	// // 	lastDemandPixels[closestPixelIndex] = lastDemandPixels[numUnassigned - 1]; 
+
+	// // 	assignments[totalPixels - numUnassigned].x = supplyPixel;
+	// // 	assignments[totalPixels - numUnassigned].y = lastDemandPixels[closestPixelIndex];
+	// // 	printf("Last resort %d->%d\n", supplyPixel, lastDemandPixels[closestPixelIndex]);
+
+		
+	// // 	numUnassigned--;
+	// // 	pixelIndex--;
+	// // }
+	
+	// // Final image creation
+	struct image* output = resizeImage(supply, supply);
+	double* newData = (double*)calloc(totalPixels, sizeof(double) * output->bytesPerPixel);
+	int bytesPerPixel = output->bytesPerPixel;
+	double* data = output->data;
+
+	for (int i = 0; i < totalPixels; i++) {
+		struct vector2 assignment = assignments[i];
+		int originalIndex = assignment.x;
+		int newIndex = assignment.y;
+		// printf("%d->%d\n", originalIndex, newIndex);
+
+		u8* originalIndexPtr = (u8*) data + originalIndex * bytesPerPixel; 
+		u8* newIndexPtr = (u8*) data + newIndex * bytesPerPixel;
+
+		for (int byte = 0; byte < bytesPerPixel; byte++) {
+			// printf("%d/", originalIndexPtr[byte]);
+			newIndexPtr[byte] = originalIndexPtr[byte];
+		}
+		// printf("\n");
+	}
+
+	output->data = newData;
+	
+	return output;
+}
 
 // well this stinks 
 struct image* stinkhornCPU(struct image* supply, struct image* demand, double reg, double precision, u32 maxIter, u8 flags){
@@ -290,8 +453,8 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 	struct vectorN* v0 = (struct vectorN*)malloc(sizeof(struct vectorN)); 
 	u0->n = supplyVector->n;
 	v0->n = demandVector->n;
-	u0->data = (double*)(malloc(sizeof(double)*u0->n));
-	v0->data = (double*)(malloc(sizeof(double)*v0->n));
+	u0->data = (double*)(malloc(sizeof(double) * (u0->n)));
+	v0->data = (double*)(malloc(sizeof(double) * (v0->n)));
 	printf("%p\n", u0->data);
 
 
@@ -306,10 +469,11 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 	u16 iter = 0;
 	char* str = (char*)malloc(50);
 
+
 	
 
 	while(error > precision && c > 0 && iter < maxIter){ 
-		printf("\n\n");
+		// printf("\n\n");
 		for(int i=0; i<v0->n; i++){
 			double val = 0.0;
 			for(int j=0; j<v0->n; j++){
@@ -348,7 +512,13 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 		}
 
 		if(flags & (MAKE_GIF_FLAG | RECURSIVE_IMAGE_FLAG)){
-			struct image* prog = createImageCPU(supply, demand, u0, v0, reg, supplyVector, flags);
+			struct image* prog;
+			if(flags & USE_GREEDY_ALGORITHM) {
+				prog = discreteCreateImage(supply, demand, u0, v0, reg, supplyVector, demandVector, flags);
+			} else {
+				prog = createImageCPU(supply, demand, u0, v0, reg, supplyVector, flags);
+			}
+
 			if(flags & MAKE_GIF_FLAG){
 				sprintf(str, "output/gif/%04d.png", iter);
 				writeImage(prog, str);
@@ -372,9 +542,13 @@ struct image* stinkhornCPU(struct image* supply, struct image* demand, double re
 
 	//printVector(u0);
 	//printVector(v0);
-
-	return createImageCPU(supply, demand, u0, v0, reg, supplyVector, flags);
+	if(flags & USE_GREEDY_ALGORITHM) {
+		return discreteCreateImage(supply, demand, u0, v0, reg, supplyVector, demandVector, flags);
+	} else {
+		return createImageCPU(supply, demand, u0, v0, reg, supplyVector, flags);
+	}
 }
+
 
 struct image* createImage(struct image* supply, struct image* demand, struct vectorN* u0, struct vectorN* v0, double reg, struct vectorN* supplyVector, u8 flags){
 	struct image* output = malloc(sizeof(struct image));
@@ -508,7 +682,13 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 	}
 	//printVector(u0);
 	//printVector(v0);
-	return createImage(supply, demand, u0, v0, reg, supplyVector, flags);
+	// return createImage(supply, demand, u0, v0, reg, supplyVector, flags);
+
+	if(flags & USE_GREEDY_ALGORITHM) {
+		return discreteCreateImage(supply, demand, u0, v0, reg, supplyVector, demandVector, flags);
+	} else {
+		return createImage(supply, demand, u0, v0, reg, supplyVector, flags);
+	}
 	//return createImageCPU(supply, demand, u0, v0, reg, supplyVector);
 }
 

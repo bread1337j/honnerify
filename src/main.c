@@ -55,6 +55,8 @@ int main(int argc, char** argv){
 			flags |= RECURSIVE_IMAGE_FLAG;
 		}else if(!strcmp(argv[i], "-v")){
 			flags |= PRINT_TRANSPORT_PLAN;
+		}else if(!strcmp(argv[i], "-d")){
+			flags |= USE_GREEDY_ALGORITHM;
 		} else {
 			printf("Unknown argument %s\n", argv[i]);
 			exit(2);
