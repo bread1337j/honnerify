@@ -11,9 +11,9 @@ INCLUDES = -I$(INCLUDE)
 CFLAGS   = $(INCLUDES) -MMD -MP -lm -O3
 CC       = nvcc
 #Total hip obliteration.
-# ARGS = -t SmallHonner.png -s RescaledTarget.png -d
+ARGS = -t SmallHonner.png -s RescaledTarget.png -d -r 500
 # ARGS = -t ReallySmall1.png -s ReallySmall2.png -d
-ARGS = -t SmallTarget.png -s SmallSrc.png -g -R -c -v
+# ARGS = -t SmallTarget.png -s SmallSrc.png -g -R -c -v
 #ARGS = -t ReallySmall1.png -s ReallySmall2.png -c -g $(ARG)
 
 _SOURCES  := $(shell find $(SRC) -name '*.c')

@@ -431,7 +431,7 @@ struct image* discreteCreateImage(struct image* supply, struct image* demand, st
 		// printf("%d->%d\n", originalIndex, newIndex);
 
 		u8* originalIndexPtr = (u8*) data + originalIndex * bytesPerPixel; 
-		u8* newIndexPtr = (u8*) data + newIndex * bytesPerPixel;
+		u8* newIndexPtr = (u8*) newData + newIndex * bytesPerPixel;
 
 		for (int byte = 0; byte < bytesPerPixel; byte++) {
 			// printf("%d/", originalIndexPtr[byte]);
