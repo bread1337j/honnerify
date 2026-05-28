@@ -1,4 +1,8 @@
 .clangd
+*.png
+*.jpg
+*.jpeg
+*.bmp
 bin
 build
 output

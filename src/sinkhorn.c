@@ -598,6 +598,8 @@ struct image* createImage(struct image* supply, struct image* demand, struct vec
 	
 	
 	if(flags & PRINT_TRANSPORT_PLAN){
+		printVector(u0);
+		printVector(v0);
 		for(int i=0; i<u0->n; i++){
 			if(supplyVector->data[i] > 0){
 				for(int j=0; j<v0->n; j++){
@@ -659,6 +661,9 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 	u16 iter = 0;
 	char* str = (char*)malloc(50);
 	
+	if(flags & MAKE_GIF_FLAG){
+		writeImage(supply, "output/gif/0000.png");
+	}
 	while(iter < maxIter){ 
 		callSinkhorn(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
 		printf("Iteration %d\n", iter);

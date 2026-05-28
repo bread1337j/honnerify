@@ -15,7 +15,7 @@ int main(int argc, char** argv){
 	struct image* _target = NULL;//loadImage(argv[1]);
 	struct image* source = NULL;//loadImage(argv[2]);
 	int maxIter = 100;
-	double reg = 0.1;
+	double reg = 10;
 	char* outputString = "output/Output.png";
 	u8 flags = 0;
 	for(int i=1; i<argc; i++){

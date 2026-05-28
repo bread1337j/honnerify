@@ -12,13 +12,13 @@ struct matrix {
 };
 
 struct vector3 {
-	u16 x, y, z;
+	double x, y, z;
 };
 struct vector2 {
-	u16 x, y;
+	double x, y;
 };
 struct vectorN {
-	u16 n;
+	u32 n;
 	double* data;
 };
 
