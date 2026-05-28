@@ -1,65 +1,66 @@
-.PHONY: compile run clean
+.PHONY: compile run clean test
 
-BIN = bin
-TARGET = $(BIN)/honnerify
-BUILD = build
-SRC = src
+BIN     = bin
+TARGET  = $(BIN)/honnerify
+BUILD   = build
+SRC     = src
 INCLUDE = include
-OUTPUT = output
+OUTPUT  = output
 
 INCLUDES = -I$(INCLUDE)
-CFLAGS = $(INCLUDES) -MMD -MP -lm 
-CC = nvcc
+CFLAGS   = $(INCLUDES) -MMD -MP -lm
+CC       = nvcc
 #Total hip obliteration.
 ARGS = -t SmallTarget.png -s SmallSrc.png -c -g -R
 #ARGS = -t ReallySmall1.png -s ReallySmall2.png -c -g $(ARG)
 
-
-
-DEPS := $(OBJECTS:.o=.d)
-
-_SOURCES := $(shell find $(SRC) -name '*.c')
+_SOURCES  := $(shell find $(SRC) -name '*.c')
 CUSOURCES := $(shell find $(SRC) -name '*.cu')
-HEADERS := $(shell find $(SRC) -name '*.h')
-HEADERS := $(shell find $(INCLUDE) -name '*.h')
-_OBJECTS = $(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(_SOURCES))
+
+_OBJECTS  = $(patsubst $(SRC)/%.c,  $(BUILD)/%.o, $(_SOURCES))
 CUOBJECTS = $(patsubst $(SRC)/%.cu, $(BUILD)/%.o, $(CUSOURCES))
 
 SOURCES = $(_SOURCES) $(CUSOURCES)
 OBJECTS = $(_OBJECTS) $(CUOBJECTS)
 
+# Must be defined after OBJECTS so the substitution actually has something to work with
+DEPS := $(OBJECTS:.o=.d)
 
 
-run: compile $(OUTPUT)
+run: compile | $(OUTPUT)
 	./$(TARGET) $(ARGS)
 
 compile: $(TARGET)
 	@echo $(OBJECTS)
 
-test: 
+test:
 	@echo $(SOURCES)
 	@echo $(OBJECTS)
 
-$(TARGET): $(OBJECTS)
+$(TARGET): $(OBJECTS) | $(BIN)
+	nvcc $(CFLAGS) $(OBJECTS) -o $(TARGET)
+
+# Use order-only prerequisite (| $(BUILD)) so the directory timestamp
+# never causes object files to be considered out of date
+$(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
+	@mkdir -p $(@D)
+	gcc $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/%.o: $(SRC)/%.cu | $(BUILD)
+	@mkdir -p $(@D)
+	nvcc $(CFLAGS) -c -o $@ $<
+
+$(BUILD):
+	@mkdir -p $(BUILD)
+
+$(BIN):
 	@mkdir -p $(BIN)
-	nvcc $(CFLAGS) $(OBJECTS) -o $(TARGET) 
 
-$(BUILD)/%.o: $(SRC)/%.c $(BUILD)
-	@mkdir -p $(@D)
-	gcc $(CFLAGS) -c -o $@ $< 
+$(OUTPUT):
+	@mkdir -p $(OUTPUT)
+	@mkdir -p $(OUTPUT)/gif
 
-$(BUILD)/%.o: $(SRC)/%.cu $(BUILD)
-	@mkdir -p $(@D)
-	nvcc $(CFLAGS) -c -o $@ $< 
-
-$(BUILD): 
-	@mkdir -p build
-
-$(OUTPUT): 
-	@mkdir -p output
-	@mkdir -p output/gif
-
-clean: 
+clean:
 	rm -rf $(BUILD) $(BIN)
 
--include $(DEPS) 
+-include $(DEPS)
