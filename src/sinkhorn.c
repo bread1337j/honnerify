@@ -269,10 +269,21 @@ struct image* discreteCreateImage(struct image* supply, struct image* demand, st
 	int numUnassigned = totalPixels;
 	int* assignedDemandPixels = calloc(totalPixels, sizeof(int)); //demand obv
 	int* pixelsToAssign = malloc(sizeof(int) * totalPixels); //ie supply
+	srand(0);
 	for (int i = 0; i < totalPixels; i++) {
-		pixelsToAssign[i] = i;
+		pixelsToAssign[i] = i;//(int)(random()*totalPixels);
 		// RANDOMIZE THIS SELECTION
 	}
+	for (int i = 0; i < totalPixels; i++) {
+		int j = (int)(random() % (totalPixels));
+		int temp = pixelsToAssign[i];
+		pixelsToAssign[i] = pixelsToAssign[j];
+		pixelsToAssign[j] = temp;
+		// RANDOMIZE THIS SELECTION
+		// ok :thumbsup:
+	}
+
+
 	struct vector2* assignments = calloc(totalPixels, sizeof(struct vector2));
 	// x=original position/supply   &&     y=new position/demand
 
@@ -352,7 +363,7 @@ struct image* discreteCreateImage(struct image* supply, struct image* demand, st
 				//assign
 				assignments[totalPixels - numUnassigned].x = supplyPixel;
 				assignments[totalPixels - numUnassigned].y = likeliestDemandPixel;
-				printf("%lf/%lf Assigned %d->%d\n", likelihood, threshold, supplyPixel, likeliestDemandPixel);
+				//printf("%lf/%lf Assigned %d->%d\n", likelihood, threshold, supplyPixel, likeliestDemandPixel);
 
 				numUnassigned--;
 				// determines later if all pixels are mutually unassigned
@@ -668,7 +679,7 @@ struct image* sinkhornCuda(struct image* supply, struct image* demand, double re
 		callSinkhorn(u0->data, v0->data, supplyVector->data, demandVector->data, u0->n, supply->width, supply->height, reg);
 		printf("Iteration %d\n", iter);
 		iter++;
-		if(flags & (MAKE_GIF_FLAG | RECURSIVE_IMAGE_FLAG)){
+		if(flags & (MAKE_GIF_FLAG | RECURSIVE_IMAGE_FLAG) && iter%1 == 0){
 			struct image* prog;
 			if(flags & USE_GREEDY_ALGORITHM){
 				prog = discreteCreateImage(supply, demand, u0, v0, reg, supplyVector, demandVector, flags);
