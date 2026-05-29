@@ -17,6 +17,8 @@ honnerify [OPTIONS]
 - -c | Use CUDA runtime 
 - -g | Create a GIF
 - -R | Recursive mode, an output image is created on every iteration and is then used as the new source image. 
+- -v | Print out the transport plan. Use at your own risk. 
+- -d | Greedy algorithm for image creation. Do not mix this with -R. 
 
 ### How it works:
 
